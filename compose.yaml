@@ -1,0 +1,39 @@
+name: python_template_module
+services:
+  python_template_module:
+    container_name: python_template_module
+    image: ghcr.io/ad-sdl/python_template_module
+    build:
+      context: .
+      tags:
+        - ghcr.io/ad-sdl/python_template_module:latest
+        - ghcr.io/ad-sdl/python_template_module:dev
+    volumes:
+      - ./src:/home/app/python_template_module/src
+      - ./tests:/home/app/python_template_module/tests
+    command: python -m python_template_module --port 2000
+    ports:
+      - 2000:2000
+#####################
+# WEI Core Services #
+#####################
+  python_template_wei_server:
+    image: ghcr.io/ad-sdl/wei
+    container_name: python_template_wei_server
+    ports:
+      - 8000:8000
+    environment:
+      - PYTHONUNBUFFERED=1 # Fix weird bug with empty logging
+      - USER_ID=${USER_ID:-1000}
+      - GROUP_ID=${GROUP_ID:-1000}
+    volumes:
+      - ./workcells:/workcells
+    command: python3 -m wei.server --workcell /workcells/test.workcell.yaml
+    depends_on:
+      - python_template_wei_redis
+  python_template_wei_redis:
+    image: redis
+    container_name: python_template_wei_redis
+    ports:
+      - 6379:6379
+    command: redis-server --save 60 1 --loglevel warning

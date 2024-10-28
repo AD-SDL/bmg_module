@@ -1,0 +1,26 @@
+name: Rename Module Repo
+
+# Only run when the new module is created
+on: [create, workflow_dispatch]
+
+jobs:
+    rename:
+        runs-on: ubuntu-latest
+        steps:
+            - uses: actions/checkout@v3
+              with:
+                # by default, it uses a depth of 1
+                # this fetches all history so that we can read each commit
+                fetch-depth: 0
+                ref: ${{ github.head_ref }}
+
+            - run: |
+                replacement_string="$(echo '${{ github.repository }}' | awk -F '/' '{print $2}' | tr '-' '_' | tr '[:upper:]' '[:lower:]')"
+                replacement_string="${replacement_string%_module}"
+                .github/rename.sh python_template "$replacement_string"
+
+            - uses: stefanzweifel/git-auto-commit-action@v4
+              with:
+                commit_message: "Renamed module"
+                push_options: --force
+                file_pattern: . :!.github # Don't modify the workflow
