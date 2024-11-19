@@ -2,17 +2,24 @@
 
 A WEI-powered module for controlling BMG Microplate Readers, currently tested with the VANTAstar model.
 
-Contains a BMG driver (bmg_driver.py) and BMG REST Node (bmg_rest_node.py) 
+Contains a BMG driver (bmg_driver.py) and BMG REST Node (bmg_rest_node.py). 
 
-### Installation
-
-    git clone https://github.com/AD-SDL/bmg_module.git
-    cd bmg_module 
-    pip install -e .
 
 ### Running instructions
 
 The BMG driver and REST Node can only connect to the device if run with **32-bit python**. In the following commands, be sure that you're running the correct python version, replacing 'python' with the complete path to your 32-bit python .exe file if necessary. 
+
+#### Installation
+
+When running the last line of these install instructions, be sure to pip install using your 32-bit python. An example of how to do this is below but make sure to replace python.exe with the path to your 32-bit python .exe.
+
+    python.exe -m pip install -e .
+
+General install instructions: 
+
+    git clone https://github.com/AD-SDL/bmg_module.git
+    cd bmg_module 
+    pip install -e .
 
 #### Running the driver
 
@@ -47,8 +54,7 @@ The REST Node can be started with a command in the format below
     python bmg_rest_node.py --port <your_port> --db_directory_path <(optional) path to bmg db directory containing assay .TCS files> --output_path <(optional) path to directory for saving data output files>
 
 
---db_directory_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" unless specified.
--- output_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data" unless specified.
+--db_directory_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" unless specified and -- output_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data" unless specified.
 
 Example usage with no optional arguments (remember to use 32-bit python): 
 
