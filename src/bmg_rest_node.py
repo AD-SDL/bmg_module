@@ -108,6 +108,7 @@ def set_temp(
             # temp input is valid
             state.bmg = BmgCom("CLARIOstar")
             state.bmg.set_temp(temp=temp)
+            return StepResponse.step_succeeded()
 
 
 # RUN ASSAY ACTION

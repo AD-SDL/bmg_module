@@ -1,24 +1,113 @@
-# python_template_module
+# BMG module 
 
-A template module, implemented in python, for integrating a device into a WEI workcell.
+A WEI-powered module for controlling BMG Microplate Readers, currently tested with the VANTAstar model.
 
-## Using This Template
+Contains a BMG driver (bmg_driver.py) and BMG REST Node (bmg_rest_node.py) 
 
-[Creating a Repository From a Template](https://docs.github.com/en/repositories/creating-and-managing-repositories/creating-a-repository-from-a-template)
+### Installation
+
+'''
+git clone https://github.com/AD-SDL/bmg_module.git
+cd bmg_module 
+pip install -e .
+'''
+
+### Running instructions
+
+The BMG driver and REST Node can only connect to the device if run with **32-bit python**. In the following commands, be sure that you're running the correct python version, replacing 'python' with the complete path to your 32-bit python .exe file if necessary. 
+
+#### Running the driver
+
+'''
+cd bmg_modle
+cd src
+python bmg_driver.py
+'''
+
+This will print out the current BMG LABTECH Remote Control Version Number if the driver is able to connect correctly to the BMG device.
+
+You can also use the driver in other programs. See the below python program uses the bmg driver to open and close the plate tray, then sets the temperature and runs an assay named ASSAY_TEST. When connecting, the model must be CLARIOstar even when using a VANTAstar model.
+
+'''
+import bmg_driver
+
+bmg_device = BmgCom("CLARIOstar")
+bmg_device.plate_out()
+bmg_device.plate_in()
+bmg_device.set_temp(30.0)
+bmg_device.run_assay(
+    protocol_name = "ASSAY_TEST,
+    protocol_database_path = "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" ,
+    data_output_directory = "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data",
+    data_output_filename = "data.txt",
+)
+
+'''
+
+Be sure to replace the protoocl_database_path and data_output_directory with your correct paths. 
 
 
-## Renaming
+#### Running the REST Node
 
-To automatically replace `python_template` with the name of your instrument, run the "Rename Module Repo" GitHub Actions Workflow in your repository: [Manually Running a Workflow](https://docs.github.com/en/actions/managing-workflow-runs-and-deployments/managing-workflow-runs/manually-running-a-workflow)
+The REST Node can be started with a command in the format below
 
-N.B. this assumes your repository is named using the `<instrument_name>_module` format.
+''' 
+python bmg_rest_node.py --port <your_port> --db_directory_path <(optional) path to bmg db directory containing assay .TCS files> --output_path <(optional) path to directory for saving data output files>
+'''
 
-Alternatively, you can run `.github/rename.sh python_template <new_name>` locally and commit the results.
+--db_directory_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" unless specified.
+-- output_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data" unless specified.
 
-## TODO's
+Example usage with no optional arguments (remember to use 32-bit python): 
 
-Throughout this module template, there are a number of comments marked `TODO`. You can use search/find and replace to help ensure you're taking full advantage of the module template and don't have any residual template artifacts hanging around.
+'''
+pyhton bmg_rest_node.py --port 3003
+'''
 
-## Guide to Writing Your Own Module
+Example usage with all optional arguments: 
 
-For more details on how to write your own module (either using this template or from scratch), see [How-To: Modules (WEI Docs)](https://rpl-wei.readthedocs.io/en/latest/pages/how-to/module.html)
+'''
+python bmg_rest_node.py --port 3003 --db_directory_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" --output_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
+'''
+
+### Example Usage in WEI Workflow YAML file
+
+Below is an example of a YAML WEI Workflow file that could interact with the BMG REST Node. 
+
+'''
+name: BMG Example
+author: RPL 
+info: An example WEI workflow to show availible BMG actions
+version: '0.1'
+
+flowdef:
+- name: open bmg
+  module: bmg
+  action: open
+
+- name: close bmg
+  module: bmg
+  action: close
+
+- name: set temp
+  module: bmg
+  action: set_temp
+  args:
+    temp: 30.0
+
+- name: Run bmg
+  module: bmg
+  action: run_assay
+  args: 
+    assay_name: Assay_name
+    data_output_file_name: assay_data.txt
+'''
+
+
+
+
+
+
+
+
+
