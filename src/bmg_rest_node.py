@@ -48,7 +48,7 @@ def bmg_startup(state: State):
 
     try:
         """Start the module but do not connect to the device here.
-        Connecting here causes dropped connections when sending actions. """
+        Connecting here, even just to check state, causes dropped connections when sending actions."""
         pass
 
     except Exception:
@@ -57,24 +57,6 @@ def bmg_startup(state: State):
 
     else:
         print("BMG module online")
-
-# TODO: Figure out state handler that works
-# @rest_module.state_handler()
-# def check_state(state: State) -> ModuleState:
-#     """Updates the BMG state"""
-
-#     state.bmg = BmgCom("CLARIOstar")
-#     bmg_state = state.bmg.status()
-
-#     if bmg_state == "Ready":
-#         return ModuleStatus.READY
-#     elif bmg_state == "Busy":
-#         return ModuleStatus.BUSY
-#     elif bmg_state == "Error":
-#         return ModuleStatus.ERROR
-#     else:
-#         return ModuleStatus.UNKNOWN
-
 
 # OPEN TRAY ACTION
 @rest_module.action(
@@ -105,6 +87,29 @@ def close(
     state.bmg.plate_in()
     return StepResponse.step_succeeded()
 
+
+# SET TEMP ACTION
+@rest_module.action(
+    name="set_temp", description="Set the temperature"
+)
+def set_temp(
+    state: State,
+    action: ActionRequest,
+    temp: Annotated[float, "temperature in celcius. 00.0 (off), 00.1 (off with temp monitoring), and 25.0-45.0 deg C are valid inputs"]
+) -> StepResponse:
+    """Sets the temperature on the BMG microplate reader"""
+
+    temp = float(temp)
+    if not temp == 0.0 or temp == 0.1:
+        if temp < 25.0 or temp > 45.0:
+            # temp input is not valid
+            return StepResponse.step_failed(error="Invalid temperature input value")
+        else:
+            # temp input is valid
+            state.bmg = BmgCom("CLARIOstar")
+            state.bmg.set_temp(temp=temp)
+
+
 # RUN ASSAY ACTION
 @rest_module.action(
     name="run_assay", description="run an assay on the BMG VANTAstar plate reader"
@@ -113,7 +118,7 @@ def run_assay(
     state: State,
     action: ActionRequest,
     assay_name: Annotated[str, "assay to run"],
-    data_output_file_name: Annotated[str, "data output filename (ex. \"data.txt\")"] = None,
+    data_output_file_name: Annotated[str, "data output filename (ex. data.txt)"] = None,
 ) -> StepFileResponse:
     """Runs an assay on the BMG plate reader"""
 

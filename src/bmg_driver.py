@@ -62,6 +62,23 @@ class BmgCom:
         """Opens the plate tray on the BMG plate reader"""
         self.exec('PlateOut')
 
+    def set_temp(self, temp:float):
+        """Sets the temperature on the BMG plate reader.
+
+        Allowed values:
+            00.0 = The incubator unit will be switched off.
+            00.1 = Temperature will not be controlled, but will be monitored.
+            25.0 - 45.0 = Incubator will be switched on and new temp value will be set. Can be changed in increments of 0.1 deg C
+            10.0 - 60.0 = This range is ONLY allowed on extended range models. WE DO NOT HAVE THIS
+
+        Notes:
+            - Will throw error code -20 if temp input is not a valid value.
+            - Temp must be a float to be valid.
+            - If more than one decimal point are included, will round to nearest valid temp input.
+        """
+        nominal_temp = str(temp)
+        self.exec('Temp', nominal_temp)
+
     def run_assay(
         self,
         protocol_name:str,
