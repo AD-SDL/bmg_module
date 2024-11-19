@@ -1,5 +1,5 @@
 """
-REST-based node that interfaces with WEI and provides a simple Sleep(t) function
+REST-based node for BMG microplate readers that interfaces with WEI
 """
 
 import time
@@ -8,14 +8,6 @@ from typing import Annotated
 
 from starlette.datastructures import State
 from wei.modules.rest_module import RESTModule
-from wei.types.module_types import (
-    LocalFileModuleActionResult,
-    ModuleAction,
-    ModuleActionArg,
-    ModuleState,
-    ModuleStatus,
-    ValueModuleActionResult,
-)
 from wei.types.step_types import (
     ActionRequest,
     StepFileResponse,
