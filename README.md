@@ -4,6 +4,9 @@ A WEI-powered module for controlling BMG Microplate Readers, currently tested wi
 
 Contains a BMG driver (bmg_driver.py) and BMG REST Node (bmg_rest_node.py). 
 
+### Assay Setup on BMG microplate reader
+
+In order to run an assay on the BMG plate reader, you first need to create the assay using the BMG Smart Control software (not the Voyager software). Once the assay is created and saved, it needs to be exported and the .TCS file should be placed inside the BMG directory that contains the assay database .db file ("C:\Program Files (x86)\BMG\CLARIOstar\User\Definit" with default BMG Smart Control on Windows). Once the .TCS file for your assay has been saved into the database directory, it can be accessed by our BMG driver and REST Node by assay name. 
 
 ### Running instructions
 
@@ -23,7 +26,7 @@ General install instructions:
 
 #### Running the driver
 
-    cd bmg_modle
+    cd bmg_module
     cd src
     python bmg_driver.py
 
@@ -44,7 +47,7 @@ You can also use the driver in other programs. See the below python program uses
         data_output_filename = "data.txt",
     )
 
-Be sure to replace the protoocl_database_path and data_output_directory with your correct paths. 
+Be sure to replace the protocol_database_path and data_output_directory with your correct paths. 
 
 
 #### Running the REST Node
@@ -59,7 +62,7 @@ The REST Node can be started with a command in the format below
 Example usage with no optional arguments (remember to use 32-bit python): 
 
 
-    pyhton bmg_rest_node.py --port 3003
+    python bmg_rest_node.py --port 3003
 
 
 Example usage with all optional arguments: 
@@ -74,7 +77,7 @@ Below is an example of a YAML WEI Workflow file that could interact with the BMG
 
     name: BMG Example
     author: RPL 
-    info: An example WEI workflow to show availible BMG actions
+    info: An example WEI workflow to show available BMG actions
     version: '0.1'
 
     flowdef:

@@ -19,13 +19,13 @@ from bmg_driver import BmgCom  # import the bmg driver
 
 rest_module = RESTModule(
     name="bmg_module",
-    verson="0.0.1",
+    version="0.0.1",
     description="A REST node to control the BMG VANTAstar microplate reader",
     model="bmg",
 )
 # add arguments
 rest_module.arg_parser.add_argument(
-    "--output_path", type=str, help="data ourtput directory path for bmg data", default="C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
+    "--output_path", type=str, help="data output directory path for bmg data", default="C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
 )
 rest_module.arg_parser.add_argument(
     "--db_directory_path", type=str, help="path to directory where assay protocol files are stored", default="C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit"
@@ -87,20 +87,19 @@ def close(
 def set_temp(
     state: State,
     action: ActionRequest,
-    temp: Annotated[float, "temperature in celcius. 00.0 (off), 00.1 (off with temp monitoring), and 25.0-45.0 deg C are valid inputs"]
+    temp: Annotated[float, "temperature in celsius. 00.0 (off), 00.1 (off with temp monitoring), and 25.0-45.0 deg C are valid inputs"]
 ) -> StepResponse:
     """Sets the temperature on the BMG microplate reader"""
 
     temp = float(temp)
-    if not temp == 0.0 or temp == 0.1:
-        if temp < 25.0 or temp > 45.0:
-            # temp input is not valid
-            return StepResponse.step_failed(error="Invalid temperature input value")
-        else:
-            # temp input is valid
-            state.bmg = BmgCom("CLARIOstar")
-            state.bmg.set_temp(temp=temp)
-            return StepResponse.step_succeeded()
+    if temp in {0.0, 0.1} or 25.0 <= temp <= 45.0:
+        # temp input is valid
+        state.bmg = BmgCom("CLARIOstar")
+        state.bmg.set_temp(temp=temp)
+        return StepResponse.step_succeeded()
+    else: 
+        # temp input is not valid
+        return StepResponse.step_failed(error="Invalid temperature input value")
 
 
 # RUN ASSAY ACTION
