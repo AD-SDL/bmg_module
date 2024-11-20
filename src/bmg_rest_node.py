@@ -2,8 +2,6 @@
 REST-based node for BMG microplate readers that interfaces with WEI
 """
 
-import time
-from pathlib import Path
 from typing import Annotated
 
 from starlette.datastructures import State
@@ -15,7 +13,7 @@ from wei.types.step_types import (
     StepStatus,
 )
 
-from bmg_driver import BmgCom  # import the bmg driver
+from bmg_interface import BmgCom  # import the bmg interface
 
 rest_module = RESTModule(
     name="bmg_module",
@@ -33,22 +31,6 @@ rest_module.arg_parser.add_argument(
 # parse the arguments
 args = rest_module.arg_parser.parse_args()
 
-
-@rest_module.startup()
-def bmg_startup(state: State):
-    """BMG startup handler"""
-
-    try:
-        """Start the module but do not connect to the device here.
-        Connecting here, even just to check state, causes dropped connections when sending actions."""
-        pass
-
-    except Exception:
-        print("Error when starting BMG module")
-        raise
-
-    else:
-        print("BMG module online")
 
 # OPEN TRAY ACTION
 @rest_module.action(
@@ -97,7 +79,7 @@ def set_temp(
         state.bmg = BmgCom("CLARIOstar")
         state.bmg.set_temp(temp=temp)
         return StepResponse.step_succeeded()
-    else: 
+    else:
         # temp input is not valid
         return StepResponse.step_failed(error="Invalid temperature input value")
 
@@ -110,25 +92,17 @@ def run_assay(
     state: State,
     action: ActionRequest,
     assay_name: Annotated[str, "assay to run"],
-    data_output_file_name: Annotated[str, "data output filename (ex. data.txt)"] = None,
+    data_output_file_name: Annotated[str, "data output file name (ex. data.txt). Will default to <timestamp>.txt (ex. 1731706249.txt) if no file name is entered."] = None,
 ) -> StepFileResponse:
     """Runs an assay on the BMG plate reader"""
 
-    # give the data file a unique name if no name is specified
-    if not data_output_file_name:
-        data_output_file_name = str(int(time.time())) + ".txt"
-
-    # format the data output file name and path
-    data_dir = Path(args.output_path)
-    data_file_path = data_dir / data_output_file_name
-
     # run the assay
     state.bmg = BmgCom("CLARIOstar")
-    state.bmg.run_assay(
+    data_file_path = state.bmg.run_assay(
         protocol_name=assay_name,
         protocol_database_path=args.db_directory_path,
         data_output_directory=args.output_path,
-        data_output_filename=data_output_file_name,
+        data_output_file_name=data_output_file_name,
         )
 
     # return the assay results file

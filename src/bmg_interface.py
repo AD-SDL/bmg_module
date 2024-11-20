@@ -3,6 +3,8 @@ Driver for the BMG microplate reader (our model is VANTAstar)
 """
 
 import ctypes
+import time
+from pathlib import Path
 
 import comtypes.client
 import pythoncom
@@ -84,13 +86,22 @@ class BmgCom:
         protocol_name:str,
         protocol_database_path:str,
         data_output_directory:str,
-        data_output_filename:str,
+        data_output_file_name:str = None,
         plate_id1:int = 1,  # these plate IDs are optional
         plate_id2:int = 2,  # but why? what do they do?
         plate_id3:int = 3,  # and why are there three? curious.
 
     ):
         """Runs an assay on the BMG plate reader"""
+
+        # give the data file a unique name if no name is specified
+        if not data_output_file_name:
+            data_output_file_name = str(int(time.time())) + ".txt"
+
+        # format the data output file name and path
+        data_dir = Path(data_output_directory)
+        data_file_path = data_dir / data_output_file_name
+
         self.exec(
             'Run',
             protocol_name,
@@ -100,8 +111,10 @@ class BmgCom:
             plate_id2,
             plate_id3,
             data_output_directory,
-            data_output_filename
+            data_output_file_name
         )
+
+        return data_file_path
 
     def isBusy(self):
         """Returns True if BMG is busy, False if not busy"""

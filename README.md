@@ -54,21 +54,23 @@ Be sure to replace the protocol_database_path and data_output_directory with you
 
 The REST Node can be started with a command in the format below
 
-    python bmg_rest_node.py --port <your_port> --db_directory_path <(optional) path to bmg db directory containing assay .TCS files> --output_path <(optional) path to directory for saving data output files>
+    python.exe bmg_rest_node.py --port <your_port> --db_directory_path <(optional) path to bmg db directory containing assay .TCS files> --output_path <(optional) path to directory for saving data output files>
 
 
---db_directory_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" unless specified and -- output_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data" unless specified.
+--db_directory_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" unless specified \
+and -- output_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data" unless specified.
 
 Example usage with no optional arguments (remember to use 32-bit python): 
 
 
-    python bmg_rest_node.py --port 3003
+    python.exe bmg_rest_node.py --port 3003
 
 
 Example usage with all optional arguments: 
 
 
-    python bmg_rest_node.py --port 3003 --db_directory_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" --output_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
+    python.exe bmg_rest_node.py --port 3003 --db_directory_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" \
+    --output_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
 
 
 ### Example Usage in WEI Workflow YAML file
@@ -82,23 +84,23 @@ Below is an example of a YAML WEI Workflow file that could interact with the BMG
 
     flowdef:
     - name: open bmg
-    module: bmg
-    action: open
+      module: bmg
+      action: open
 
     - name: close bmg
-    module: bmg
-    action: close
+      module: bmg
+      action: close
 
     - name: set temp
-    module: bmg
-    action: set_temp
-    args:
+      module: bmg
+      action: set_temp
+      args:
         temp: 30.0
 
     - name: Run bmg
-    module: bmg
-    action: run_assay
-    args: 
+      module: bmg
+      action: run_assay
+      args: 
         assay_name: Assay_name
         data_output_file_name: assay_data.txt
 
