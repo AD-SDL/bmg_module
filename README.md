@@ -54,9 +54,7 @@ Be sure to replace the protocol_database_path and data_output_directory with you
 
 The REST Node can be started with a command in the format below
 
-    python.exe bmg_rest_node.py --port <your_port> \
-    --db_directory_path <(optional) path to bmg db directory containing assay .TCS files> \
-    --output_path <(optional) path to directory for saving data output files>
+    python.exe bmg_rest_node.py --port <your_port> --db_directory_path <(optional) path to bmg db directory containing assay .TCS files> --output_path <(optional) path to directory for saving data output files>
 
 
 --db_directory_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" unless specified \
@@ -71,9 +69,7 @@ Example usage with no optional arguments (remember to use 32-bit python):
 Example usage with all optional arguments: 
 
 
-    python.exe bmg_rest_node.py --port 3003 \
-    --db_directory_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" \
-    --output_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
+    python.exe bmg_rest_node.py --port 3003 --db_directory_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" --output_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
 
 
 ### Example Usage in WEI Workflow YAML file
