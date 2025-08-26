@@ -9,8 +9,9 @@ dependencies = [
     "uvicorn>=0.14.0",
     "ad_sdl.wei>=0.7.2,<8.0",
     "pytest",
-    "pythoncom",
+    "pywin32",
     "comtypes",
+    "starlette",
 ]
 requires-python = ">=3.9.1"
 readme = "README.md"

@@ -24,6 +24,8 @@ General install instructions:
     cd bmg_module 
     pip install -e .
 
+If you're having trouble installing the requirements or wei due to an issue installing httptools, use the Visual Studio Installer (download this if you don't have it already), and either modify or install Visual Studio Community 2022 to include "Desktop development with C++".
+
 #### Running the driver
 
     cd bmg_module
