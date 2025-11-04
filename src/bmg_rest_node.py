@@ -23,6 +23,8 @@ TODOs:
 
 - always says ready even though workflow step shows it's still running for the correct amount of time
 
+- add temperature monitoring to custom state function and also interface?
+
 - MADSci second workflow step sent always fails after first one works
     # NOTE: can't close connection after each step becuase closing the connection closes the device door
 - MADSci: clicking show editable workflow step causes Squid dashboard page to freeze
@@ -109,7 +111,7 @@ class BMGNode(RestNode):
         self.bmg.plate_in()
 
     @action(name="set_temp")
-    def set_temp(self, temp: float) -> None | ActionFailed:
+    def set_temp(self, temp: float) -> None:
         """Sets the temperature on the BMG microplate reader"""
 
         temp = float(temp)
