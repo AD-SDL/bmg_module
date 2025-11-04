@@ -1,25 +1,25 @@
-name: python_template_module
+name: bmg_module
 services:
-  python_template_module:
-    container_name: python_template_module
-    image: ghcr.io/ad-sdl/python_template_module
+  bmg_module:
+    container_name: bmg_module
+    image: ghcr.io/ad-sdl/bmg_module
     build:
       context: .
       tags:
-        - ghcr.io/ad-sdl/python_template_module:latest
-        - ghcr.io/ad-sdl/python_template_module:dev
+        - ghcr.io/ad-sdl/bmg_module:latest
+        - ghcr.io/ad-sdl/bmg_module:dev
     volumes:
-      - ./src:/home/app/python_template_module/src
-      - ./tests:/home/app/python_template_module/tests
-    command: python -m python_template_module --port 2000
+      - ./src:/home/app/bmg_module/src
+      - ./tests:/home/app/bmg_module/tests
+    command: python -m bmg_module --port 2000
     ports:
       - 2000:2000
 #####################
 # WEI Core Services #
 #####################
-  python_template_wei_server:
+  bmg_wei_server:
     image: ghcr.io/ad-sdl/wei
-    container_name: python_template_wei_server
+    container_name: bmg_wei_server
     ports:
       - 8000:8000
     environment:
@@ -30,10 +30,10 @@ services:
       - ./workcells:/workcells
     command: python3 -m wei.server --workcell /workcells/test.workcell.yaml
     depends_on:
-      - python_template_wei_redis
-  python_template_wei_redis:
+      - bmg_wei_redis
+  bmg_wei_redis:
     image: redis
-    container_name: python_template_wei_redis
+    container_name: bmg_wei_redis
     ports:
       - 6379:6379
     command: redis-server --save 60 1 --loglevel warning
