@@ -1,0 +1,7 @@
+node_name: bmg
+node_id: 
+node_description: A node definition for BMG plate reader 
+node_type: device
+module_name: bmg_module
+module_version: 1.1.0
+capabilities: null

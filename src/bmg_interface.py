@@ -3,68 +3,91 @@ Driver for the BMG microplate reader (our model is VANTAstar)
 """
 
 import ctypes
+import threading
 import time
 from pathlib import Path
+from typing import Any, Optional
 
 import comtypes.client
 import pythoncom
+from madsci.client.event_client import EventClient
+from madsci.client.resource_client import ResourceClient
+from madsci.common.types.resource_types import Slot
+
+"""TODO:
+- when to edit resource client and plate carrier? - there's not really a state change of the plate like in the peeler"""
 
 
 class BmgCom:
-    def __init__(self, control_name=None):
+    """Class to communicate with BMG microplate readers via ActiveX COM interface."""
+
+    def __init__(
+        self,
+        control_name: str,
+        resource_client: ResourceClient = None,
+        plate_carrier: Optional[Slot] = None,
+        logger: EventClient = None,
+    ) -> None:
         """Initializes and opens the connection the BMG plate reader"""
+
+        self.control_name = control_name
+        self.resource_client = resource_client
+        self.plate_carrier = plate_carrier
+        self.logger = logger or EventClient()
+        self.serial_lock = threading.Lock()
+        self._device_lock = threading.Lock()  # TODO: what is this for?
+
         pythoncom.CoInitialize()
         self.com = comtypes.client.CreateObject("BMG_ActiveX.BMGRemoteControl")
         if control_name:
-            self.open_connection(control_name)
+            self.open_connection()
 
-    def open_connection(self, control_name):
+    def open_connection(self) -> None:
         """Open a connection to the BMG plate reader"""
-        ep = ctypes.c_char_p(control_name.encode('ascii'))
+        ep = ctypes.c_char_p(self.control_name.encode("ascii"))
         res = self.com.OpenConnection(ep)
         if res:
             raise Exception(f"OpenConnection failed: {res}")
 
-    def close_connection(self):
+    def close_connection(self) -> None:
         """Close the connection to the BMG plate reader"""
         res = self.com.CloseConnection()
         if res:
             raise Exception(f"CloseConnection failed: {res}")
 
-    def version(self):
+    def version(self) -> str:
         """Returns the BMG instrument version"""
-        version = self.com.GetVersion()
-        return version
+        return self.com.GetVersion()
 
-    def dummy(self):
+    def dummy(self) -> None:
         """Use this to test if a connection to a BMG plate reader is active"""
-        self.exec('Dummy')
+        self.exec("Dummy")
 
-    def status(self):
+    def status(self) -> str:
         """Returns the current status of the BMG plate reader"""
         item = ctypes.c_char_p(b"Status")
         status = self.com.GetInfo(item)
-        return status.strip() if isinstance(status, str) else 'unknown'
+        return status.strip() if isinstance(status, str) else "unknown"
 
-    def error(self):
+    def error(self) -> str:
         """Returns any errors on the BMG plate reader"""
         item = ctypes.c_char_p(b"Error")
         status = self.com.GetInfo(item)
-        return status.strip() if isinstance(status, str) else 'unknown'
+        return status.strip() if isinstance(status, str) else "unknown"
 
-    def init(self):
+    def init(self) -> None:
         """Initializes the BMG plate reader"""
-        self.exec('Init')
+        self.exec("Init")
 
-    def plate_in(self):
+    def plate_in(self) -> None:
         """Closes the plate tray on the BMG plate reader"""
-        self.exec('PlateIn')
+        self.exec("PlateIn")
 
-    def plate_out(self):
+    def plate_out(self) -> None:
         """Opens the plate tray on the BMG plate reader"""
-        self.exec('PlateOut')
+        self.exec("PlateOut")
 
-    def set_temp(self, temp:float):
+    def set_temp(self, temp: float) -> None:
         """Sets the temperature on the BMG plate reader.
 
         Allowed values:
@@ -79,19 +102,18 @@ class BmgCom:
             - If more than one decimal point are included, will round to nearest valid temp input.
         """
         nominal_temp = str(temp)
-        self.exec('Temp', nominal_temp)
+        self.exec("Temp", nominal_temp)
 
     def run_assay(
         self,
-        protocol_name:str,
-        protocol_database_path:str,
-        data_output_directory:str,
-        data_output_file_name:str = None,
-        plate_id1:int = 1,  # these plate IDs are optional
-        plate_id2:int = 2,  # but why? what do they do?
-        plate_id3:int = 3,  # and why are there three? curious.
-
-    ):
+        protocol_name: str,
+        protocol_database_path: str,
+        data_output_directory: str,
+        data_output_file_name: Optional[str] = None,
+        plate_id1: int = 1,  # these plate IDs are optional
+        plate_id2: int = 2,  # but why? what do they do?
+        plate_id3: int = 3,  # and why are there three? curious.
+    ) -> str:
         """Runs an assay on the BMG plate reader"""
 
         # give the data file a unique name if no name is specified
@@ -103,7 +125,7 @@ class BmgCom:
         data_file_path = data_dir / data_output_file_name
 
         self.exec(
-            'Run',
+            "Run",
             protocol_name,
             protocol_database_path,
             data_output_directory,
@@ -111,28 +133,24 @@ class BmgCom:
             plate_id2,
             plate_id3,
             data_output_directory,
-            data_output_file_name
+            data_output_file_name,
         )
 
         return data_file_path
 
-    def isBusy(self):
+    def is_busy(self) -> bool:
         """Returns True if BMG is busy, False if not busy"""
-        return self.status() == 'Busy'
+        return self.status() == "Busy"
 
-    def exec(self, cmd, *args):
+    def exec(self, cmd: str, *args: Any) -> None:
         """Executed a command over the established connection with the BMG plate reader"""
-        args = tuple((cmd, *args))
-        print(args)
-        res = self.com.ExecuteAndWait(args)
-        if res:
-            raise Exception(f"command {cmd} failed: {res}")
-
-if __name__ == '__main__':
-   com = BmgCom("CLARIOstar")
-   print(f"BMG LABTECH Remote Control Version: {com.version()}")
+        with self._device_lock:
+            args = (cmd, *args)
+            res = self.com.ExecuteAndWait(args)
+            if res:
+                raise Exception(f"command {cmd} failed: {res}")
 
 
-
-
-
+if __name__ == "__main__":
+    com = BmgCom("CLARIOstar")
+    print(f"BMG LABTECH Remote Control Version: {com.version()}")  # noqa: T201

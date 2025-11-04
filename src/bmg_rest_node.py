@@ -2,120 +2,160 @@
 REST-based node for BMG microplate readers that interfaces with WEI
 """
 
-from typing import Annotated
+from pathlib import Path
+from typing import Annotated, Optional
 
-from starlette.datastructures import State
-from wei.modules.rest_module import RESTModule
-from wei.types.step_types import (
-    ActionRequest,
-    StepFileResponse,
-    StepResponse,
-    StepStatus,
+from madsci.common.types.action_types import ActionFailed
+from madsci.common.types.node_types import RestNodeConfig
+from madsci.common.types.resource_types import (
+    Slot,
 )
+from madsci.node_module.helpers import action
+from madsci.node_module.rest_node_module import RestNode
 
-from bmg_interface import BmgCom  # import the bmg interface
+from bmg_interface import BmgCom
 
-rest_module = RESTModule(
-    name="bmg_module",
-    version="0.0.1",
-    description="A REST node to control the BMG VANTAstar microplate reader",
-    model="bmg",
-)
-# add arguments
-rest_module.arg_parser.add_argument(
-    "--output_path", type=str, help="data output directory path for bmg data", default="C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
-)
-rest_module.arg_parser.add_argument(
-    "--db_directory_path", type=str, help="path to directory where assay protocol files are stored", default="C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit"
-)
-# parse the arguments
-args = rest_module.arg_parser.parse_args()
+"""
+TODOs:
+- figure out pdm dependencies with 32 bit python
+    Q: why does creating a .venv with the 32-bit python then pip installing not work?
+    only using '<python 32-bit path.exe> -m pip install ... seems to work but it's not in the activated .venv ....
 
+- always says ready even though workflow step shows it's still running for the correct amount of time
 
-# OPEN TRAY ACTION
-@rest_module.action(
-    name="open", description="Open the bmg plate tray"
-)
-def open(
-    state: State,
-    action: ActionRequest,
-) -> StepResponse:
-    """Opens the BMG plate tray"""
-
-    state.bmg = BmgCom("CLARIOstar")
-    state.bmg.plate_out()
-    return StepResponse.step_succeeded()
+- MADSci second workflow step sent always fails after first one works
+    # NOTE: can't close connection after each step becuase closing the connection closes the device door
+- MADSci: clicking show editable workflow step causes Squid dashboard page to freeze
+- MADSci: something is wrong with passing paths in through the command line args. Only works when default paths are set in BMGNodeConfig
+"""
 
 
-# CLOSE TRAY ACTION
-@rest_module.action(
-    name="close", description="Close the BMG plate tray"
-)
-def close(
-    state: State,
-    action: ActionRequest,
-) -> StepResponse:
-    """Closes the BMG plate tray"""
+class BMGNodeConfig(RestNodeConfig):
+    """Configuration for the BMG node."""
 
-    state.bmg = BmgCom("CLARIOstar")
-    state.bmg.plate_in()
-    return StepResponse.step_succeeded()
+    output_path: str = "C:\\Users\\RPL\\TEST"
+    """Data output directory path for bmg data"""
+    db_directory_path: str = "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit"
+    """Path to directory where assay protocol files are stored"""
 
 
-# SET TEMP ACTION
-@rest_module.action(
-    name="set_temp", description="Set the temperature"
-)
-def set_temp(
-    state: State,
-    action: ActionRequest,
-    temp: Annotated[float, "temperature in celsius. 00.0 (off), 00.1 (off with temp monitoring), and 25.0-45.0 deg C are valid inputs"]
-) -> StepResponse:
-    """Sets the temperature on the BMG microplate reader"""
+class BMGNode(RestNode):
+    """A node to control the BMG VANTAstar microplate reader"""
 
-    temp = float(temp)
-    if temp in {0.0, 0.1} or 25.0 <= temp <= 45.0:
-        # temp input is valid
-        state.bmg = BmgCom("CLARIOstar")
-        state.bmg.set_temp(temp=temp)
-        return StepResponse.step_succeeded()
-    else:
-        # temp input is not valid
-        return StepResponse.step_failed(error="Invalid temperature input value")
+    bmg: BmgCom = None
+    config_model = BMGNodeConfig
+    config: BMGNodeConfig = BMGNodeConfig()
+    module_version = "0.0.1"
 
+    def startup_handler(self) -> None:
+        """Called to (re)initialize the node. Should be used to open connections to devices or initialize any other resources."""
 
-# RUN ASSAY ACTION
-@rest_module.action(
-    name="run_assay", description="run an assay on the BMG VANTAstar plate reader"
-)
-def run_assay(
-    state: State,
-    action: ActionRequest,
-    assay_name: Annotated[str, "assay to run"],
-    data_output_file_name: Annotated[str, "data output file name (ex. data.txt). Will default to <timestamp>.txt (ex. 1731706249.txt) if no file name is entered."] = None,
-) -> StepFileResponse:
-    """Runs an assay on the BMG plate reader"""
+        self.init_resource_templates()
+        self.create_resources()
+        self.bmg = None
 
-    # run the assay
-    state.bmg = BmgCom("CLARIOstar")
-    data_file_path = state.bmg.run_assay(
-        protocol_name=assay_name,
-        protocol_database_path=args.db_directory_path,
-        data_output_directory=args.output_path,
-        data_output_file_name=data_output_file_name,
+    def init_resource_templates(self) -> None:
+        """Initialize resource templates for the node module."""
+
+        self.resource_client.create_template(
+            resource=Slot(
+                resource_class="bmg_plate_nest",
+                resource_description="The plate nest for a BMG microplate reader",
+            ),
+            template_name="bmg_plate_nest",
+            description="Template of a BMG microplate reader plate nest",
+            tags=["PlateNest", "ANSI/SLAS"],
         )
 
-    # return the assay results file
-    return StepFileResponse(
-        StepStatus.SUCCEEDED,
-        files={"assay_result": str(data_file_path)}
-    )
+    def create_resources(self) -> None:
+        """Create resources for the node module."""
+
+        self.plate_carrier = self.resource_client.create_resource_from_template(
+            "bmg_plate_nest",
+            resource_name=f"{self.node_definition.node_name}_plate_nest",
+        )
+
+    def shutdown_handler(self) -> None:
+        """Called to clean up resources before the node is shut down."""
+        try:
+            if self.bmg:
+                self.bmg.close_connection()
+                self.bmg = None
+        except Exception as err:
+            self.logger.log_error(f"Error during BMGNode shutdown: {err}")
+
+    @action(name="open")
+    def open(self) -> None:
+        """Opens the BMG plate tray"""
+
+        self.bmg = BmgCom(
+            "CLARIOstar",
+            resource_client=self.resource_client,
+            plate_carrier=self.plate_carrier,
+            logger=self.logger,
+        )
+        self.bmg.plate_out()
+
+    @action(name="close")
+    def close(self) -> None:
+        """Closes the BMG plate tray"""
+
+        self.bmg = BmgCom(
+            "CLARIOstar",
+            resource_client=self.resource_client,
+            plate_carrier=self.plate_carrier,
+            logger=self.logger,
+        )
+        self.bmg.plate_in()
+
+    @action(name="set_temp")
+    def set_temp(self, temp: float) -> None | ActionFailed:
+        """Sets the temperature on the BMG microplate reader"""
+
+        temp = float(temp)
+        if temp in {0.0, 0.1} or 25.0 <= temp <= 45.0:
+            # temp input is valid
+            self.bmg = BmgCom(
+                "CLARIOstar",
+                resource_client=self.resource_client,
+                plate_carrier=self.plate_carrier,
+                logger=self.logger,
+            )
+            self.bmg.set_temp(temp=temp)
+            return None
+        # temp input is not valid (fail action, don't put node in error state)
+        return ActionFailed(errors=["Invalid temperature input value"])
+
+    @action(name="run_assay")
+    def run_assay(
+        self,
+        assay_name: str,
+        data_output_file_name: Annotated[
+            Optional[str],
+            "data output file name (ex. data.txt). Will default to <timestamp>.txt (ex. 1731706249.txt) if no file name is entered.",
+        ] = None,
+    ) -> Annotated[Path, "Data .txt file returned by the BMG microplate reader"]:
+        """Runs an assay on the BMG plate reader"""
+
+        data_file_path = None
+
+        # run the assay
+        self.bmg = BmgCom(
+            "CLARIOstar",
+            resource_client=self.resource_client,
+            plate_carrier=self.plate_carrier,
+            logger=self.logger,
+        )
+        data_file_path = self.bmg.run_assay(
+            protocol_name=assay_name,
+            protocol_database_path=self.config.db_directory_path,
+            data_output_directory=self.config.output_path,
+            data_output_file_name=data_output_file_name,
+        )
+
+        return Path(data_file_path)
 
 
-rest_module.start()
-
-
-
-
-
-
+if __name__ == "__main__":
+    bmg_node = BMGNode()
+    bmg_node.start_node()
