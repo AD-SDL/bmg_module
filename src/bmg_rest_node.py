@@ -22,13 +22,17 @@ TODOs:
     only using '<python 32-bit path.exe> -m pip install ... seems to work but it's not in the activated .venv ....
 
 - always says ready even though workflow step shows it's still running for the correct amount of time
+    - TASK: open an issue for this. Node status remains ready when it should be busy
 
 - add temperature monitoring to custom state function and also interface?
 
 - MADSci second workflow step sent always fails after first one works
     # NOTE: can't close connection after each step becuase closing the connection closes the device door
-- MADSci: clicking show editable workflow step causes Squid dashboard page to freeze
-- MADSci: something is wrong with passing paths in through the command line args. Only works when default paths are set in BMGNodeConfig
+- MADSci: clicking show editable workflow step causes Squid dashboard page to freeze  -- TASK: open an issue on MADsci repo
+- MADSci: something is wrong with passing paths in through the command line args. Only works when default paths are set in BMGNodeConfig  
+     TASK: make these into Path types, not string and test. Probably the double slash when passing in string is the issue
+
+TASK: spin up thread in rest node init that all actions can talk to. Kill the thread on shutdown.
 """
 
 
@@ -40,6 +44,7 @@ class BMGNodeConfig(RestNodeConfig):
     db_directory_path: str = "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit"
     """Path to directory where assay protocol files are stored"""
 
+    
 
 class BMGNode(RestNode):
     """A node to control the BMG VANTAstar microplate reader"""
@@ -49,12 +54,22 @@ class BMGNode(RestNode):
     config: BMGNodeConfig = BMGNodeConfig()
     module_version = "0.0.1"
 
+    def __init__(self) -> None:
+        """Initializes the BMG node."""
+        super().__init__()
+        self.bmg = BmgCom(
+            "CLARIOstar",
+            resource_client=self.resource_client,
+            # plate_carrier=self.plate_carrier,
+            logger=self.logger,
+        )
+
     def startup_handler(self) -> None:
         """Called to (re)initialize the node. Should be used to open connections to devices or initialize any other resources."""
 
         self.init_resource_templates()
         self.create_resources()
-        self.bmg = None
+        
 
     def init_resource_templates(self) -> None:
         """Initialize resource templates for the node module."""
@@ -89,26 +104,17 @@ class BMGNode(RestNode):
     @action(name="open")
     def open(self) -> None:
         """Opens the BMG plate tray"""
-
-        self.bmg = BmgCom(
-            "CLARIOstar",
-            resource_client=self.resource_client,
-            plate_carrier=self.plate_carrier,
-            logger=self.logger,
-        )
+        self.logger.log_info("Opening BMG plate tray")
         self.bmg.plate_out()
+        self.logger.log_info("BMG plate tray opened")
 
     @action(name="close")
     def close(self) -> None:
         """Closes the BMG plate tray"""
 
-        self.bmg = BmgCom(
-            "CLARIOstar",
-            resource_client=self.resource_client,
-            plate_carrier=self.plate_carrier,
-            logger=self.logger,
-        )
+        self.logger.log_info("Closing BMG plate tray")
         self.bmg.plate_in()
+        self.logger.log_info("BMG plate tray closed")
 
     @action(name="set_temp")
     def set_temp(self, temp: float) -> None:

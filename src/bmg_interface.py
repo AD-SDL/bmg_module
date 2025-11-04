@@ -144,11 +144,10 @@ class BmgCom:
 
     def exec(self, cmd: str, *args: Any) -> None:
         """Executed a command over the established connection with the BMG plate reader"""
-        with self._device_lock:
-            args = (cmd, *args)
-            res = self.com.ExecuteAndWait(args)
-            if res:
-                raise Exception(f"command {cmd} failed: {res}")
+        args = (cmd, *args)
+        res = self.com.ExecuteAndWait(args)
+        if res:
+            raise Exception(f"command {cmd} failed: {res}")
 
 
 if __name__ == "__main__":
