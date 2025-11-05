@@ -34,8 +34,7 @@ class BmgCom:
         self.resource_client = resource_client
         self.plate_carrier = plate_carrier
         self.logger = logger or EventClient()
-        self.serial_lock = threading.Lock()
-        self._device_lock = threading.Lock()  # TODO: what is this for?
+        # self.lock = threading.Lock()
 
         pythoncom.CoInitialize()
         self.com = comtypes.client.CreateObject("BMG_ActiveX.BMGRemoteControl")
@@ -104,6 +103,37 @@ class BmgCom:
         nominal_temp = str(temp)
         self.exec("Temp", nominal_temp)
 
+    def read_temps(self) -> dict:
+        """Reads the temperature at three locations in the BMG plate reader
+        
+        Returns: 
+
+        """
+        temps = {}
+        temp1_formatted = ctypes.c_char_p(b"Temp1")
+        temp1 = self.com.GetInfo(temp1_formatted)
+        temp2_formatted = ctypes.c_char_p(b"Temp2")
+        temp2 = self.com.GetInfo(temp2_formatted)
+        temp3_formatted = ctypes.c_char_p(b"Temp3")
+        temp3 = self.com.GetInfo(temp3_formatted)
+
+        try: 
+            # convert to floats in celsius
+            temp1 = float(temp1)/10
+            temp2 = float(temp2)/10
+            temp3 = float(temp3)/10
+            temps = {
+                "Temp1" : temp1,
+                "Temp2": temp2,
+                "Temp3": temp3,
+            }
+        except Exception as e: 
+            # Error collecting temperatures, don't fail anything
+            pass   
+
+        return temps
+
+
     def run_assay(
         self,
         protocol_name: str,
@@ -140,10 +170,12 @@ class BmgCom:
 
     def is_busy(self) -> bool:
         """Returns True if BMG is busy, False if not busy"""
-        return self.status() == "Busy"
+        # return self.status() == "Busy"
+        return bool(self.lock.locked())
 
     def exec(self, cmd: str, *args: Any) -> None:
         """Executed a command over the established connection with the BMG plate reader"""
+        # with self.lock:
         args = (cmd, *args)
         res = self.com.ExecuteAndWait(args)
         if res:
@@ -153,3 +185,5 @@ class BmgCom:
 if __name__ == "__main__":
     com = BmgCom("CLARIOstar")
     print(f"BMG LABTECH Remote Control Version: {com.version()}")  # noqa: T201
+
+

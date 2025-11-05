@@ -11,6 +11,7 @@ class BMGThread(threading.Thread):
         self.resource_client = resource_client
         self.plate_carrier = plate_carrier
         self.logger = logger
+        self.lock = threading.Lock()
 
         # communication queue 
         self.command_queue = queue.Queue()
@@ -39,23 +40,51 @@ class BMGThread(threading.Thread):
 
                     # process command
                     action = command.get("action")
+                
                     # TESTING
                     self.logger.log_info(f"ACTION FOUND IN THREAD RUN FUNCTION: {action}")
-                    result = {"success": False, "data": None, "error": None}
+                    result = {
+                        "success": False, 
+                        "data": None, 
+                        "error": None
+                    }
 
-                    try: 
-                        if action == "plate_out":
-                            self.bmg.plate_out()
-                            result["success"] = True
-                        elif action == "plate_in":
-                            self.bmg.plate_in()
-                            result["success"] = True
-                        else:
-                            result["error"] = f"Unknown action: {action}"
+                    with self.lock:
+                        try: 
+                            if action == "plate_out":
+                                self.bmg.plate_out()
+                                result["success"] = True
+                            elif action == "plate_in":
+                                self.bmg.plate_in()
+                                result["success"] = True
+                            elif action == "set_temp":
+                                temp = command.get("temp")
+                                self.bmg.set_temp(temp=temp)
+                                result["success"] = True
+                            elif action == "read_temps":
+                                temps = self.bmg.read_temps()
+                                result["success"] = True
+                                result["data"] = temps
+                            elif action == "run_assay": 
+                                data_filename = self.bmg.run_assay(
+                                    protocol_name=command.get("protocol_name"),
+                                    protocol_database_path=command.get("protocol_database_path"),
+                                    data_output_directory=command.get("data_output_directory"),
+                                    data_output_file_name=command.get("data_output_file_name"),
+                                )
+                                if data_filename:
+                                    result["data"] = data_filename
 
-                    except Exception as e:
-                        result["error"] = str(e)
-                        self.logger.log_error(f"Error processing command {action}: {e}")
+                                # TODO: do we want to fail the action if no filename is returned?
+                                # presumably there's a backup on the windows machine if this happens
+                                result["success"] = True 
+                            
+                            else:
+                                result["error"] = f"Unknown action: {action}"
+
+                        except Exception as e:
+                            result["error"] = str(e)
+                            self.logger.log_error(f"Error processing command {action}: {e}")
 
                     # Send response back
                     self.response_queue.put(result)
@@ -112,4 +141,10 @@ class BMGThread(threading.Thread):
             self.logger.log_warning("BMG communication thread did not terminate in time.")
         else:   
             self.logger.log_info("BMG communication thread terminated.")
+
+    @property
+    def is_busy(self) -> bool:
+        """Returns True if the BMG thread is handling a command"""
+        return bool(self.lock.locked())
+    
         

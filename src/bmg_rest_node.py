@@ -34,7 +34,6 @@ TODOs:
 - MADSci: something is wrong with passing paths in through the command line args. Only works when default paths are set in BMGNodeConfig  
      TASK: make these into Path types, not string and test. Probably the double slash when passing in string is the issue
 
-TASK: spin up thread in rest node init that all actions can talk to. Kill the thread on shutdown.
 """
 
 
@@ -45,6 +44,7 @@ class BMGNodeConfig(RestNodeConfig):
     """Data output directory path for bmg data"""
     db_directory_path: str = "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit"
     """Path to directory where assay protocol files are stored"""
+    state_update_interval: Optional[float] = 5.0
 
     
 
@@ -55,6 +55,7 @@ class BMGNode(RestNode):
     config_model = BMGNodeConfig
     config: BMGNodeConfig = BMGNodeConfig()
     module_version = "0.0.1"
+
 
     def __init__(self) -> None:
         """Initializes the BMG node."""
@@ -99,6 +100,39 @@ class BMGNode(RestNode):
             resource_name=f"{self.node_definition.node_name}_plate_nest",
         )
 
+    def state_handler(self) -> None: 
+        """Periodically check state of BMG device"""
+        self.cached_temp1 = None
+        self.cached_temp2 = None
+        self.cached_temp3 = None
+
+        if self.bmg_thread is None:
+            self.logger.log_error("BMG thread is not initialized")
+            return
+        if self.bmg_thread.is_busy:
+            self.node_state = {
+                "Temp1 (bottom heating plate)": self.cached_temp1,
+                "Temp2 (top heating plate)": self.cached_temp2,
+                "Temp3 (optic slide heating plate)": self.cached_temp3,
+            }
+        else: 
+            # thread is not busy, query the device 
+            try: 
+                response = self.bmg_thread.send_command({"action": "read_temps"})
+                temps = response["data"]
+                self.cached_temp1 = temps["Temp1"]
+                self.cached_temp2 = temps["Temp2"]
+                self.cached_temp3 = temps["Temp3"]
+
+                self.node_state = {
+                    "Temp1 (bottom heating plate)": temps["Temp1"],
+                    "Temp2 (top heating plate)": temps["Temp2"],
+                    "Temp3 (optic slide heating plate)": temps["Temp3"],
+                }
+            except Exception as e: 
+                pass # Do nothing if this doesn't work
+
+
     def shutdown_handler(self) -> None:
         """Called to clean up resources before the node is shut down."""
         try:
@@ -111,6 +145,7 @@ class BMGNode(RestNode):
             #     self.bmg = None
         except Exception as err:
             self.logger.log_error(f"Error during BMGNode shutdown: {err}")
+
 
     @action(name="open")
     def open(self) -> None:
@@ -147,15 +182,15 @@ class BMGNode(RestNode):
 
         temp = float(temp)
         if temp in {0.0, 0.1} or 25.0 <= temp <= 45.0:
-            # temp input is valid
-            self.bmg = BmgCom(
-                "CLARIOstar",
-                resource_client=self.resource_client,
-                plate_carrier=self.plate_carrier,
-                logger=self.logger,
-            )
-            self.bmg.set_temp(temp=temp)
-            return None
+            # temp input is valid, send the command
+            response = self.bmg_thread.send_command({"action": "set_temp","temp": temp})
+
+            # interpret response
+            if not response["success"]: 
+                self.logger.log_error(f"Error setting temperature: {response["error"]}")
+                return ActionFailed(errors=[f"Error setting temperature: {response["error"]}"])
+            else:
+                return None
         # temp input is not valid (fail action, don't put node in error state)
         return ActionFailed(errors=["Invalid temperature input value"])
 
@@ -173,20 +208,37 @@ class BMGNode(RestNode):
         data_file_path = None
 
         # run the assay
-        self.bmg = BmgCom(
-            "CLARIOstar",
-            resource_client=self.resource_client,
-            plate_carrier=self.plate_carrier,
-            logger=self.logger,
-        )
-        data_file_path = self.bmg.run_assay(
-            protocol_name=assay_name,
-            protocol_database_path=self.config.db_directory_path,
-            data_output_directory=self.config.output_path,
-            data_output_file_name=data_output_file_name,
+        # self.bmg = BmgCom(
+        #     "CLARIOstar",
+        #     resource_client=self.resource_client,
+        #     plate_carrier=self.plate_carrier,
+        #     logger=self.logger,
+        # )
+        response = self.bmg_thread.send_commmand(
+            {
+                "action": "run_assay",
+                "protocol_name": assay_name,
+                "protocol_database_path": self.config.db_directory_path,
+                "data_output_directory": self.config.output_path,
+                "data_output_file_name": data_output_file_name,
+            }
         )
 
-        return Path(data_file_path)
+        # interpret response
+        if not response["success"]:
+            self.logger.log_info(f"Error running assay: {response["error"]}")
+            return ActionFailed(errors=[f"Error running assay: {response["error"]}"])
+        else: 
+            return Path(response["data"])
+
+        # data_file_path = self.bmg.run_assay(
+        #     protocol_name=assay_name,
+        #     protocol_database_path=self.config.db_directory_path,
+        #     data_output_directory=self.config.output_path,
+        #     data_output_file_name=data_output_file_name,
+        # )
+
+        # return Path(data_file_path)
 
 
 if __name__ == "__main__":
