@@ -24,7 +24,7 @@ TODOs:
     only using '<python 32-bit path.exe> -m pip install ... seems to work but it's not in the activated .venv ....
 
 - always says ready even though workflow step shows it's still running for the correct amount of time
-    - TASK: open an issue for this. Node status remains ready when it should be busy
+    - TASK: open an issue for this. Node status remains ready when it should be busy - ISSUE OPENED 
 
 - add temperature monitoring to custom state function and also interface?
 
@@ -116,10 +116,11 @@ class BMGNode(RestNode):
     def open(self) -> None:
         """Opens the BMG plate tray"""
         self.logger.log_info("Opening BMG plate tray")
-        # self.bmg.plate_out()
         
         # send command to BMG thread
-        response = self.bmg_thread.send_command({action: "plate_out"})
+        response = self.bmg_thread.send_command({"action": "plate_out"})
+
+        # interpret response
         if not response["success"]:
             raise Exception(f"Failed to open BMG plate tray: {response['error']}")
         else:
@@ -130,15 +131,11 @@ class BMGNode(RestNode):
         """Closes the BMG plate tray"""
 
         self.logger.log_info("Closing BMG plate tray")
-        # self.bmg.plate_in()
-
 
         # send command to BMG thread
-        command = {"action": "plate_in"}
-        # TESTING
-        self.logger.log_info(f"COMMAND IN REST NODE CLOSE ACTION: {command}")
-        response = self.bmg_thread.send_command(command=command)
-        
+        response = self.bmg_thread.send_command({"action": "plate_in"})
+    
+        # interpret response
         if not response["success"]:
             raise Exception(f"Failed to close BMG plate tray: {response['error']}")
         else:
