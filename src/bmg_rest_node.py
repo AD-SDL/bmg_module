@@ -4,6 +4,7 @@ REST-based node for BMG microplate readers that interfaces with WEI
 
 from pathlib import Path
 from typing import Annotated, Optional
+import threading
 
 from madsci.common.types.action_types import ActionFailed
 from madsci.common.types.node_types import RestNodeConfig
@@ -14,6 +15,7 @@ from madsci.node_module.helpers import action
 from madsci.node_module.rest_node_module import RestNode
 
 from bmg_interface import BmgCom
+from bmg_object_thread import BMGThread
 
 """
 TODOs:
@@ -57,18 +59,23 @@ class BMGNode(RestNode):
     def __init__(self) -> None:
         """Initializes the BMG node."""
         super().__init__()
-        self.bmg = BmgCom(
-            "CLARIOstar",
-            resource_client=self.resource_client,
-            # plate_carrier=self.plate_carrier,
-            logger=self.logger,
-        )
+        self.bmg_thread = None
+
 
     def startup_handler(self) -> None:
         """Called to (re)initialize the node. Should be used to open connections to devices or initialize any other resources."""
 
         self.init_resource_templates()
         self.create_resources()
+
+        # start the BMG thread after resources are initialized
+        self.bmg_thread = BMGThread(
+            resource_client=self.resource_client,
+            plate_carrier=self.plate_carrier,
+            logger=self.logger,
+        )
+        self.bmg_thread.start()
+        
         
 
     def init_resource_templates(self) -> None:
@@ -95,9 +102,13 @@ class BMGNode(RestNode):
     def shutdown_handler(self) -> None:
         """Called to clean up resources before the node is shut down."""
         try:
-            if self.bmg:
-                self.bmg.close_connection()
-                self.bmg = None
+            if self.bmg_thread:
+                self.bmg_thread.stop()
+                # self.bmg_thread.join(timeout=5)
+                # self.logger.log_info("BMG communication thread stopped.")
+            # if self.bmg:
+            #     self.bmg.close_connection()
+            #     self.bmg = None
         except Exception as err:
             self.logger.log_error(f"Error during BMGNode shutdown: {err}")
 
@@ -105,16 +116,33 @@ class BMGNode(RestNode):
     def open(self) -> None:
         """Opens the BMG plate tray"""
         self.logger.log_info("Opening BMG plate tray")
-        self.bmg.plate_out()
-        self.logger.log_info("BMG plate tray opened")
+        # self.bmg.plate_out()
+        
+        # send command to BMG thread
+        response = self.bmg_thread.send_command({action: "plate_out"})
+        if not response["success"]:
+            raise Exception(f"Failed to open BMG plate tray: {response['error']}")
+        else:
+            self.logger.log_info("BMG plate tray opened")
 
     @action(name="close")
     def close(self) -> None:
         """Closes the BMG plate tray"""
 
         self.logger.log_info("Closing BMG plate tray")
-        self.bmg.plate_in()
-        self.logger.log_info("BMG plate tray closed")
+        # self.bmg.plate_in()
+
+
+        # send command to BMG thread
+        command = {"action": "plate_in"}
+        # TESTING
+        self.logger.log_info(f"COMMAND IN REST NODE CLOSE ACTION: {command}")
+        response = self.bmg_thread.send_command(command=command)
+        
+        if not response["success"]:
+            raise Exception(f"Failed to close BMG plate tray: {response['error']}")
+        else:
+            self.logger.log_info("BMG plate tray closed")
 
     @action(name="set_temp")
     def set_temp(self, temp: float) -> None:
