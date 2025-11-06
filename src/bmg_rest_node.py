@@ -4,7 +4,6 @@ REST-based node for BMG microplate readers that interfaces with WEI
 
 from pathlib import Path
 from typing import Annotated, Optional
-import threading
 
 from madsci.common.types.action_types import ActionFailed
 from madsci.common.types.node_types import RestNodeConfig
@@ -19,19 +18,8 @@ from bmg_object_thread import BMGThread
 
 """
 TODOs:
-- figure out pdm dependencies with 32 bit python
-    Q: why does creating a .venv with the 32-bit python then pip installing not work?
-    only using '<python 32-bit path.exe> -m pip install ... seems to work but it's not in the activated .venv ....
 
-- always says ready even though workflow step shows it's still running for the correct amount of time
-    - TASK: open an issue for this. Node status remains ready when it should be busy - ISSUE OPENED 
-
-- add temperature monitoring to custom state function and also interface?
-
-- MADSci second workflow step sent always fails after first one works
-    # NOTE: can't close connection after each step becuase closing the connection closes the device door
-- MADSci: clicking show editable workflow step causes Squid dashboard page to freeze  -- TASK: open an issue on MADsci repo
-- MADSci: something is wrong with passing paths in through the command line args. Only works when default paths are set in BMGNodeConfig  
+- Something is wrong with passing paths in through the command line args. Only works when default paths are set in BMGNodeConfig
      TASK: make these into Path types, not string and test. Probably the double slash when passing in string is the issue
 
 """
@@ -45,8 +33,8 @@ class BMGNodeConfig(RestNodeConfig):
     db_directory_path: str = "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit"
     """Path to directory where assay protocol files are stored"""
     state_update_interval: Optional[float] = 5.0
+    """Interval for updating module state in seconds"""
 
-    
 
 class BMGNode(RestNode):
     """A node to control the BMG VANTAstar microplate reader"""
@@ -56,12 +44,10 @@ class BMGNode(RestNode):
     config: BMGNodeConfig = BMGNodeConfig()
     module_version = "0.0.1"
 
-
     def __init__(self) -> None:
         """Initializes the BMG node."""
         super().__init__()
         self.bmg_thread = None
-
 
     def startup_handler(self) -> None:
         """Called to (re)initialize the node. Should be used to open connections to devices or initialize any other resources."""
@@ -76,8 +62,6 @@ class BMGNode(RestNode):
             logger=self.logger,
         )
         self.bmg_thread.start()
-        
-        
 
     def init_resource_templates(self) -> None:
         """Initialize resource templates for the node module."""
@@ -100,7 +84,7 @@ class BMGNode(RestNode):
             resource_name=f"{self.node_definition.node_name}_plate_nest",
         )
 
-    def state_handler(self) -> None: 
+    def state_handler(self) -> None:
         """Periodically check state of BMG device"""
         self.cached_temp1 = None
         self.cached_temp2 = None
@@ -114,10 +98,11 @@ class BMGNode(RestNode):
                 "Temp1 (bottom heating plate)": self.cached_temp1,
                 "Temp2 (top heating plate)": self.cached_temp2,
                 "Temp3 (optic slide heating plate)": self.cached_temp3,
+                "bmg_thread_state": "BUSY",
             }
-        else: 
-            # thread is not busy, query the device 
-            try: 
+        else:
+            # thread is not busy, query the device
+            try:
                 response = self.bmg_thread.send_command({"action": "read_temps"})
                 temps = response["data"]
                 self.cached_temp1 = temps["Temp1"]
@@ -128,38 +113,34 @@ class BMGNode(RestNode):
                     "Temp1 (bottom heating plate)": temps["Temp1"],
                     "Temp2 (top heating plate)": temps["Temp2"],
                     "Temp3 (optic slide heating plate)": temps["Temp3"],
+                    "bmg_thead_state": "READY",
                 }
-            except Exception as e: 
-                pass # Do nothing if this doesn't work
-
+            except Exception as e:
+                # Do nothing except log the error if state handler doesn't work
+                self.logger.log_error(f"Error in state handler: {e}")
 
     def shutdown_handler(self) -> None:
         """Called to clean up resources before the node is shut down."""
         try:
             if self.bmg_thread:
                 self.bmg_thread.stop()
-                # self.bmg_thread.join(timeout=5)
-                # self.logger.log_info("BMG communication thread stopped.")
-            # if self.bmg:
-            #     self.bmg.close_connection()
-            #     self.bmg = None
-        except Exception as err:
-            self.logger.log_error(f"Error during BMGNode shutdown: {err}")
 
+        except Exception as err:
+            self.logger.log_error(f"Error during BMG thread and node shutdown: {err}")
 
     @action(name="open")
     def open(self) -> None:
         """Opens the BMG plate tray"""
+
         self.logger.log_info("Opening BMG plate tray")
-        
+
         # send command to BMG thread
         response = self.bmg_thread.send_command({"action": "plate_out"})
 
         # interpret response
         if not response["success"]:
             raise Exception(f"Failed to open BMG plate tray: {response['error']}")
-        else:
-            self.logger.log_info("BMG plate tray opened")
+        self.logger.log_info("BMG plate tray opened")
 
     @action(name="close")
     def close(self) -> None:
@@ -169,12 +150,11 @@ class BMGNode(RestNode):
 
         # send command to BMG thread
         response = self.bmg_thread.send_command({"action": "plate_in"})
-    
+
         # interpret response
         if not response["success"]:
             raise Exception(f"Failed to close BMG plate tray: {response['error']}")
-        else:
-            self.logger.log_info("BMG plate tray closed")
+        self.logger.log_info("BMG plate tray closed")
 
     @action(name="set_temp")
     def set_temp(self, temp: float) -> None:
@@ -183,14 +163,17 @@ class BMGNode(RestNode):
         temp = float(temp)
         if temp in {0.0, 0.1} or 25.0 <= temp <= 45.0:
             # temp input is valid, send the command
-            response = self.bmg_thread.send_command({"action": "set_temp","temp": temp})
+            response = self.bmg_thread.send_command(
+                {"action": "set_temp", "temp": temp}
+            )
 
             # interpret response
-            if not response["success"]: 
-                self.logger.log_error(f"Error setting temperature: {response["error"]}")
-                return ActionFailed(errors=[f"Error setting temperature: {response["error"]}"])
-            else:
-                return None
+            if not response["success"]:
+                self.logger.log_error(f"Error setting temperature: {response['error']}")
+                return ActionFailed(
+                    errors=[f"Error setting temperature: {response['error']}"]
+                )
+            return None
         # temp input is not valid (fail action, don't put node in error state)
         return ActionFailed(errors=["Invalid temperature input value"])
 
@@ -205,15 +188,7 @@ class BMGNode(RestNode):
     ) -> Annotated[Path, "Data .txt file returned by the BMG microplate reader"]:
         """Runs an assay on the BMG plate reader"""
 
-        data_file_path = None
-
-        # run the assay
-        # self.bmg = BmgCom(
-        #     "CLARIOstar",
-        #     resource_client=self.resource_client,
-        #     plate_carrier=self.plate_carrier,
-        #     logger=self.logger,
-        # )
+        # run the assay, collect response containting output data file name
         response = self.bmg_thread.send_commmand(
             {
                 "action": "run_assay",
@@ -226,19 +201,9 @@ class BMGNode(RestNode):
 
         # interpret response
         if not response["success"]:
-            self.logger.log_info(f"Error running assay: {response["error"]}")
-            return ActionFailed(errors=[f"Error running assay: {response["error"]}"])
-        else: 
-            return Path(response["data"])
-
-        # data_file_path = self.bmg.run_assay(
-        #     protocol_name=assay_name,
-        #     protocol_database_path=self.config.db_directory_path,
-        #     data_output_directory=self.config.output_path,
-        #     data_output_file_name=data_output_file_name,
-        # )
-
-        # return Path(data_file_path)
+            self.logger.log_info(f"Error running assay: {response['error']}")
+            return ActionFailed(errors=[f"Error running assay: {response['error']}"])
+        return Path(response["data"])
 
 
 if __name__ == "__main__":

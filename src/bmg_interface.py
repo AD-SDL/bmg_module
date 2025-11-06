@@ -3,7 +3,6 @@ Driver for the BMG microplate reader (our model is VANTAstar)
 """
 
 import ctypes
-import threading
 import time
 from pathlib import Path
 from typing import Any, Optional
@@ -11,8 +10,6 @@ from typing import Any, Optional
 import comtypes.client
 import pythoncom
 from madsci.client.event_client import EventClient
-from madsci.client.resource_client import ResourceClient
-from madsci.common.types.resource_types import Slot
 
 """TODO:
 - when to edit resource client and plate carrier? - there's not really a state change of the plate like in the peeler"""
@@ -24,17 +21,12 @@ class BmgCom:
     def __init__(
         self,
         control_name: str,
-        resource_client: ResourceClient = None,
-        plate_carrier: Optional[Slot] = None,
         logger: EventClient = None,
     ) -> None:
         """Initializes and opens the connection the BMG plate reader"""
 
         self.control_name = control_name
-        self.resource_client = resource_client
-        self.plate_carrier = plate_carrier
         self.logger = logger or EventClient()
-        # self.lock = threading.Lock()
 
         pythoncom.CoInitialize()
         self.com = comtypes.client.CreateObject("BMG_ActiveX.BMGRemoteControl")
@@ -105,8 +97,8 @@ class BmgCom:
 
     def read_temps(self) -> dict:
         """Reads the temperature at three locations in the BMG plate reader
-        
-        Returns: 
+
+        Returns:
 
         """
         temps = {}
@@ -117,22 +109,21 @@ class BmgCom:
         temp3_formatted = ctypes.c_char_p(b"Temp3")
         temp3 = self.com.GetInfo(temp3_formatted)
 
-        try: 
+        try:
             # convert to floats in celsius
-            temp1 = float(temp1)/10
-            temp2 = float(temp2)/10
-            temp3 = float(temp3)/10
+            temp1 = float(temp1) / 10
+            temp2 = float(temp2) / 10
+            temp3 = float(temp3) / 10
             temps = {
-                "Temp1" : temp1,
+                "Temp1": temp1,
                 "Temp2": temp2,
                 "Temp3": temp3,
             }
-        except Exception as e: 
-            # Error collecting temperatures, don't fail anything
-            pass   
+        except Exception:
+            # Don't do anything except log if temperature collection fails
+            self.logger.log_error("Error collecting temperatures: {e}")
 
         return temps
-
 
     def run_assay(
         self,
@@ -170,12 +161,10 @@ class BmgCom:
 
     def is_busy(self) -> bool:
         """Returns True if BMG is busy, False if not busy"""
-        # return self.status() == "Busy"
         return bool(self.lock.locked())
 
     def exec(self, cmd: str, *args: Any) -> None:
         """Executed a command over the established connection with the BMG plate reader"""
-        # with self.lock:
         args = (cmd, *args)
         res = self.com.ExecuteAndWait(args)
         if res:
@@ -185,5 +174,3 @@ class BmgCom:
 if __name__ == "__main__":
     com = BmgCom("CLARIOstar")
     print(f"BMG LABTECH Remote Control Version: {com.version()}")  # noqa: T201
-
-
