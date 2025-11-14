@@ -57,8 +57,6 @@ class BMGNode(RestNode):
 
         # start the BMG thread after resources are initialized
         self.bmg_thread = BMGThread(
-            resource_client=self.resource_client,
-            plate_carrier=self.plate_carrier,
             logger=self.logger,
         )
         self.bmg_thread.start()
@@ -117,7 +115,7 @@ class BMGNode(RestNode):
                 }
             except Exception as e:
                 # Do nothing except log the error if state handler doesn't work
-                self.logger.log_error(f"Error in state handler: {e}")
+                self.logger.log_warning(f"Error in state handler: {e}")
 
     def shutdown_handler(self) -> None:
         """Called to clean up resources before the node is shut down."""

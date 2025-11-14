@@ -1,24 +1,18 @@
 [project]
-name = "brooks_xpeel_module"
+name = "bmg_module"
 version = "1.1.0"
-description = "Software for automatting a A4S sealer device"
+description = "Software for automatting a BMG VANTAstar"
 authors = [
-    {name = "Doga Ozgulbas", email="dozgulbas@anl.gov"},
+    {name = "Casey Stone", email="cstone@anl.gov"},
     {name = "Ryan D. Lewis", email="ryan.lewis@anl.gov"},
-    {name = "Tobias Ginsburg", email = "tginsburg@anl.gov"},
 ]
 
 dependencies = [
-    "fastapi>=0.103",
-    "uvicorn>=0.14.0",
-    "pyserial",
     "madsci.node_module~=0.5.0",
     "madsci.client~=0.5.0",
     "madsci.common~=0.5.0",
-    "pytest",
     "pywin32",
     "comtypes",
-    "starlette",
 ]
 
 requires-python = ">=3.9.1"
