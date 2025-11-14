@@ -105,7 +105,7 @@ config:
   update_node_files: true
   status_update_interval: 2.0
   state_update_interval: 5.0
-  node_url: http://127.0.0.1:2000/
+  node_url: http://suestorm.cels.anl.gov:3003/
   uvicorn_kwargs: {}
   output_path: C:\Users\RPL\TEST
   db_directory_path: C:\Program Files (x86)\BMG\CLARIOstar\User\Definit
