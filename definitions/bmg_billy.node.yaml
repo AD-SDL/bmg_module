@@ -1,5 +1,5 @@
-node_name: bmg
-node_id:
+node_name: bmg_billy
+node_id: 01KAC1JS0HYKAQDD39PKYN36S4
 node_description: A node definition for BMG plate reader
 node_type: device
 module_name: bmg_module

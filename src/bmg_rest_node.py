@@ -22,13 +22,15 @@ TODOs:
 - Something is wrong with passing paths in through the command line args. Only works when default paths are set in BMGNodeConfig
      TASK: make these into Path types, not string and test. Probably the double slash when passing in string is the issue
 
+- TODO: Take output path out of config and make it a required argument in run_assay that users have to specify in the workflow
+
 """
 
 
 class BMGNodeConfig(RestNodeConfig):
     """Configuration for the BMG node."""
 
-    output_path: str = "C:\\Users\\RPL\\TEST"
+    output_path: str = "C:\\Users\\RPL\\TEST"   # TODO: change this to the default BMG output file location
     """Data output directory path for bmg data"""
     db_directory_path: str = "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit"
     """Path to directory where assay protocol files are stored"""
@@ -66,10 +68,9 @@ class BMGNode(RestNode):
 
         self.resource_client.create_template(
             resource=Slot(
-                resource_class="bmg_plate_nest",
                 resource_description="The plate nest for a BMG microplate reader",
             ),
-            template_name="bmg_plate_nest",
+            template_name="bmg.nest",
             description="Template of a BMG microplate reader plate nest",
             tags=["PlateNest", "ANSI/SLAS"],
         )
@@ -78,8 +79,8 @@ class BMGNode(RestNode):
         """Create resources for the node module."""
 
         self.plate_carrier = self.resource_client.create_resource_from_template(
-            "bmg_plate_nest",
-            resource_name=f"{self.node_definition.node_name}_plate_nest",
+            template_name="bmg.nest",
+            resource_name=f"{self.node_definition.node_name}.nest",
         )
 
     def state_handler(self) -> None:
@@ -187,7 +188,7 @@ class BMGNode(RestNode):
         """Runs an assay on the BMG plate reader"""
 
         # run the assay, collect response containting output data file name
-        response = self.bmg_thread.send_commmand(
+        response = self.bmg_thread.send_command(
             {
                 "action": "run_assay",
                 "protocol_name": assay_name,
@@ -200,6 +201,7 @@ class BMGNode(RestNode):
         # interpret response
         if not response["success"]:
             self.logger.log_info(f"Error running assay: {response['error']}")
+            self.logger.log_info(f"response: {response}")
             return ActionFailed(errors=[f"Error running assay: {response['error']}"])
         return Path(response["data"])
 

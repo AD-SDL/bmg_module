@@ -1,9 +1,9 @@
-node_name: inheco.node
-node_id: 01K9DJ8X5PM87Y3YWCBPYJHMXS
-node_description: null
+node_name: bmg_billy
+node_id: 01KAC1JS0HYKAQDD39PKYN36S4
+node_description: A node definition for BMG plate reader
 node_type: device
-module_name: bmg_node
-module_version: 0.0.1
+module_name: bmg_module
+module_version: 1.1.0
 capabilities:
   get_info: true
   get_state: true
@@ -100,7 +100,7 @@ actions:
     var_args_schema: null
     var_kwargs_schema: null
 config:
-  node_definition: definitions\inheco.node.yaml
+  node_definition: C:\\Users\\RPL\\source\\repos\\bmg_module\\definitions\\bmg_billy.node.yaml
   node_info_path: null
   update_node_files: true
   status_update_interval: 2.0
