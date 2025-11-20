@@ -11,9 +11,6 @@ import comtypes.client
 import pythoncom
 from madsci.client.event_client import EventClient
 
-"""TODO:
-- when to edit resource client and plate carrier? - there's not really a state change of the plate like in the peeler"""
-
 
 class BmgCom:
     """Class to communicate with BMG microplate readers via ActiveX COM interface."""
@@ -129,7 +126,7 @@ class BmgCom:
         self,
         protocol_name: str,
         protocol_database_path: str,
-        data_output_directory: str,
+        data_output_directory_path: str,
         data_output_file_name: Optional[str] = None,
         plate_id1: int = 1,  # these plate IDs are optional
         plate_id2: int = 2,  # but why? what do they do?
@@ -142,18 +139,18 @@ class BmgCom:
             data_output_file_name = str(int(time.time())) + ".txt"
 
         # format the data output file name and path
-        data_dir = Path(data_output_directory)
+        data_dir = Path(data_output_directory_path)
         data_file_path = data_dir / data_output_file_name
 
         self.exec(
             "Run",
             protocol_name,
             protocol_database_path,
-            data_output_directory,
+            data_output_directory_path,
             plate_id1,
             plate_id2,
             plate_id3,
-            data_output_directory,
+            data_output_directory_path,
             data_output_file_name,
         )
 
@@ -166,10 +163,26 @@ class BmgCom:
     def exec(self, cmd: str, *args: Any) -> None:
         """Executed a command over the established connection with the BMG plate reader"""
         args = (cmd, *args)
-        res = self.com.ExecuteAndWait(args)
-        if res:
-            raise Exception(f"command {cmd} failed: {res}")
 
+        # testing
+        print("status before: ", self.status())
+        res = self.com.ExecuteAndWait(args)
+        
+        # TESTING
+        self.logger.log_info(f"Run assay response: {res=}")
+
+        # TESTING
+        if int(res) == -10: 
+            self.logger.log_error("Response of -10 found!!")
+
+      
+        # testing
+        print("status after: ", self.status())
+        # if res:
+        #     raise Exception(f"command {cmd} failed: {res}")
+
+        # Testing 
+        return res
 
 if __name__ == "__main__":
     com = BmgCom("CLARIOstar")

@@ -79,6 +79,13 @@ actions:
         argument_type: str
         required: true
         default: null
+      data_output_directory_path:
+        name: data_output_directory_path
+        description: data output directory path. Path must point to an existing folder.
+          Defaults to 'C:\Program Files (x86)\BMG\CLARIOstar\User\Data'
+        argument_type: str
+        required: false
+        default: null
       data_output_file_name:
         name: data_output_file_name
         description: data output file name (ex. data.txt). Will default to <timestamp>.txt
@@ -107,7 +114,7 @@ config:
   state_update_interval: 5.0
   node_url: http://suestorm.cels.anl.gov:3003/
   uvicorn_kwargs: {}
-  output_path: C:\Users\RPL\TEST
+  data_output_directory_path: C:\Program Files (x86)\BMG\CLARIOstar\User\Data
   db_directory_path: C:\Program Files (x86)\BMG\CLARIOstar\User\Definit
 config_schema:
   description: Configuration for the BMG node.
@@ -166,9 +173,9 @@ config_schema:
       description: Configuration for the Uvicorn server that runs the REST API.
       title: Uvicorn Configuration
       type: object
-    output_path:
-      default: C:\Users\RPL\TEST
-      title: Output Path
+    data_output_directory_path:
+      default: C:\Program Files (x86)\BMG\CLARIOstar\User\Data
+      title: Data Output Directory Path
       type: string
     db_directory_path:
       default: C:\Program Files (x86)\BMG\CLARIOstar\User\Definit

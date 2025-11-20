@@ -61,14 +61,18 @@ class BMGThread(threading.Thread):
                                 temps = self.bmg.read_temps()
                                 result["success"] = True
                                 result["data"] = temps
+                            elif action == "device_state":
+                                device_state = self.bmg.status()
+                                result["success"] = True
+                                result["data"] = device_state
                             elif action == "run_assay":
                                 data_filename = self.bmg.run_assay(
                                     protocol_name=command.get("protocol_name"),
                                     protocol_database_path=command.get(
                                         "protocol_database_path"
                                     ),
-                                    data_output_directory=command.get(
-                                        "data_output_directory"
+                                    data_output_directory_path=command.get(
+                                        "data_output_directory_path"
                                     ),
                                     data_output_file_name=command.get(
                                         "data_output_file_name"
@@ -85,6 +89,8 @@ class BMGThread(threading.Thread):
                                 result["error"] = f"Unknown action: {action}"
 
                         except Exception as e:
+                            # TESTING 
+                            self.logger.log_error(f"PROCESSING COMMAND FAILED: {e}")
                             result["error"] = str(e)
                             self.logger.log_error(
                                 f"Error processing command {action}: {e}"

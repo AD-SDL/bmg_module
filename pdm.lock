@@ -655,7 +655,7 @@ files = [
 
 [[package]]
 name = "madsci-client"
-version = "0.5.3"
+version = "0.5.4"
 requires_python = ">=3.9.1"
 summary = "The Modular Autonomous Discovery for Science (MADSci) Python Clients."
 groups = ["default"]
@@ -666,13 +666,13 @@ dependencies = [
     "trogon>=0.6.0",
 ]
 files = [
-    {file = "madsci_client-0.5.3-py3-none-any.whl", hash = "sha256:1b611f53c0adb1a0e4b14b820e1159978f91ecd7437fab10001f52ab0e663894"},
-    {file = "madsci_client-0.5.3.tar.gz", hash = "sha256:d7335229f2d7ad7a32baffcd26bb8753098a00af59b1b0ebb38d5c3da2faf5dc"},
+    {file = "madsci_client-0.5.4-py3-none-any.whl", hash = "sha256:da0811d75f8d8a402c1f1a05cae6bcffdba979d0f988447555c42cf90b1ce6b3"},
+    {file = "madsci_client-0.5.4.tar.gz", hash = "sha256:64754d904ba2a3ee5e256d2c8fcb9c7eab253a0e9289c67c1325357779cc309f"},
 ]
 
 [[package]]
 name = "madsci-common"
-version = "0.5.3"
+version = "0.5.4"
 requires_python = ">=3.9.1"
 summary = "The Modular Autonomous Discovery for Science (MADSci) Common Definitions and Utilities."
 groups = ["default"]
@@ -697,13 +697,13 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
 ]
 files = [
-    {file = "madsci_common-0.5.3-py3-none-any.whl", hash = "sha256:69cbcdad127e2c63ef8f086885844a1b1a0231833282fafa71bddb452e5681f7"},
-    {file = "madsci_common-0.5.3.tar.gz", hash = "sha256:ad0c04d0f7363404278c6ec26b78743b22e34e0c2fe01e5bfd0a12be60d76ce5"},
+    {file = "madsci_common-0.5.4-py3-none-any.whl", hash = "sha256:98ea6e0cf407a7fbc88767149f5e4f46cb384c8b7960530b7e3629114a1ae126"},
+    {file = "madsci_common-0.5.4.tar.gz", hash = "sha256:a92cef1d94cf6871ed638ac369e2f005935ab0df6af28544412acb30a1090aa8"},
 ]
 
 [[package]]
 name = "madsci-node-module"
-version = "0.5.3"
+version = "0.5.4"
 requires_python = ">=3.9.1"
 summary = "The Modular Autonomous Discovery for Science (MADSci) Node Module Helper Classes."
 groups = ["default"]
@@ -713,8 +713,8 @@ dependencies = [
     "regex",
 ]
 files = [
-    {file = "madsci_node_module-0.5.3-py3-none-any.whl", hash = "sha256:32616ae0cfaaaecbba2641b40f1e8a7a59de4acd9fd96b5ae4c015cf00191ed2"},
-    {file = "madsci_node_module-0.5.3.tar.gz", hash = "sha256:287f7e50cc2fe8ba87784b946f34e881d2a6e7f3b4fb10623b313a5aacffaa10"},
+    {file = "madsci_node_module-0.5.4-py3-none-any.whl", hash = "sha256:65bd8bb0184f11e5309e742ca4fa150b9a0f6a34d2e69f2b525478006870b180"},
+    {file = "madsci_node_module-0.5.4.tar.gz", hash = "sha256:dfa68b2e55e4230d6259f228000c1f40fddf26527a2805069679d27f5d7f6ea7"},
 ]
 
 [[package]]

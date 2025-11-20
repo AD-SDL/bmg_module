@@ -1,7 +1,6 @@
 """
 REST-based node for BMG microplate readers that interfaces with WEI
 """
-
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -16,13 +15,12 @@ from madsci.node_module.rest_node_module import RestNode
 from bmg_interface import BmgCom
 from bmg_object_thread import BMGThread
 
+
 """
 TODOs:
 
 - Something is wrong with passing paths in through the command line args. Only works when default paths are set in BMGNodeConfig
      TASK: make these into Path types, not string and test. Probably the double slash when passing in string is the issue
-
-- TODO: Take output path out of config and make it a required argument in run_assay that users have to specify in the workflow
 
 """
 
@@ -30,7 +28,7 @@ TODOs:
 class BMGNodeConfig(RestNodeConfig):
     """Configuration for the BMG node."""
 
-    output_path: str = "C:\\Users\\RPL\\TEST"   # TODO: change this to the default BMG output file location
+    data_output_directory_path: str = "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
     """Data output directory path for bmg data"""
     db_directory_path: str = "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit"
     """Path to directory where assay protocol files are stored"""
@@ -50,6 +48,10 @@ class BMGNode(RestNode):
         """Initializes the BMG node."""
         super().__init__()
         self.bmg_thread = None
+        self.cached_temp1 = None
+        self.cached_temp2 = None
+        self.cached_temp3 = None
+        self.cached_device_state = None
 
     def startup_handler(self) -> None:
         """Called to (re)initialize the node. Should be used to open connections to devices or initialize any other resources."""
@@ -85,23 +87,35 @@ class BMGNode(RestNode):
 
     def state_handler(self) -> None:
         """Periodically check state of BMG device"""
-        self.cached_temp1 = None
-        self.cached_temp2 = None
-        self.cached_temp3 = None
 
         if self.bmg_thread is None:
             self.logger.log_error("BMG thread is not initialized")
             return
+        
         if self.bmg_thread.is_busy:
             self.node_state = {
                 "Temp1 (bottom heating plate)": self.cached_temp1,
                 "Temp2 (top heating plate)": self.cached_temp2,
                 "Temp3 (optic slide heating plate)": self.cached_temp3,
                 "bmg_thread_state": "BUSY",
+                "bmg_device_state": "busy",
             }
+
         else:
             # thread is not busy, query the device
             try:
+                # collect device state
+                device_state = self.bmg_thread.send_command({"action": "device_state"})
+                if not response["success"]:
+                    self.cached_device_state = "unknown"
+                else: 
+                    self.cached_device_state = device_state["data"]
+            
+            except Exception as e: 
+                self.logger.log_error(f"Error collecting device state: {e}")
+
+            try:
+                # collect temperature readings
                 response = self.bmg_thread.send_command({"action": "read_temps"})
                 temps = response["data"]
                 self.cached_temp1 = temps["Temp1"]
@@ -109,10 +123,11 @@ class BMGNode(RestNode):
                 self.cached_temp3 = temps["Temp3"]
 
                 self.node_state = {
-                    "Temp1 (bottom heating plate)": temps["Temp1"],
-                    "Temp2 (top heating plate)": temps["Temp2"],
-                    "Temp3 (optic slide heating plate)": temps["Temp3"],
+                    "Temp1 (bottom heating plate)": self.cached_temp1,
+                    "Temp2 (top heating plate)": self.cached_temp2,
+                    "Temp3 (optic slide heating plate)": self.cached_temp3,
                     "bmg_thead_state": "READY",
+                    "bmg_device_state": self.cached_device_state
                 }
             except Exception as e:
                 # Do nothing except log the error if state handler doesn't work
@@ -180,6 +195,10 @@ class BMGNode(RestNode):
     def run_assay(
         self,
         assay_name: str,
+        data_output_directory_path: Annotated[
+            Optional[str], 
+            "data output directory path. Path must point to an existing folder. Defaults to 'C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data'"
+        ] = None, 
         data_output_file_name: Annotated[
             Optional[str],
             "data output file name (ex. data.txt). Will default to <timestamp>.txt (ex. 1731706249.txt) if no file name is entered.",
@@ -187,21 +206,42 @@ class BMGNode(RestNode):
     ) -> Annotated[Path, "Data .txt file returned by the BMG microplate reader"]:
         """Runs an assay on the BMG plate reader"""
 
+        # collect and validate the data_directory_path
+        if data_output_directory_path is None: 
+            data_output_directory_path = self.config.data_output_directory_path
+        else: 
+            # check that the directory path exists
+            try: 
+                if not Path(data_output_directory_path).is_dir():
+                    return ActionFailed(f"data_output_directory_path {data_output_directory_path} is not an existing folder")
+            except Exception as e:
+                self.logger.log_error(f"data_directory_output_path is invalid: {e}")
+                return ActionFailed(f"data_directory_output_path is invalid: {e}")
+            
+        # TESTING
+        self.logger.log_debug(f"{data_output_directory_path=}")
+
+        # TESTING
+        self.logger.log_debug("calling bmg thread run command")
         # run the assay, collect response containting output data file name
         response = self.bmg_thread.send_command(
             {
                 "action": "run_assay",
                 "protocol_name": assay_name,
                 "protocol_database_path": self.config.db_directory_path,
-                "data_output_directory": self.config.output_path,
+                "data_output_directory_path": data_output_directory_path,
                 "data_output_file_name": data_output_file_name,
             }
         )
 
+        self.logger.log_debug(f"{response=}")
+
+        
+
         # interpret response
         if not response["success"]:
-            self.logger.log_info(f"Error running assay: {response['error']}")
-            self.logger.log_info(f"response: {response}")
+            self.logger.log_error(f"Error running assay: {response['error']}")
+            self.logger.log_error(f"response: {response}")
             return ActionFailed(errors=[f"Error running assay: {response['error']}"])
         return Path(response["data"])
 
