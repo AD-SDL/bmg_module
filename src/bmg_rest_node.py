@@ -59,7 +59,7 @@ class BMGNode(RestNode):
         self.init_resource_templates()
         self.create_resources()
 
-        # start the BMG thread after resources are initialized
+        # Start the BMG thread after resources are initialized
         self.bmg_thread = BMGThread(
             logger=self.logger,
         )
@@ -102,9 +102,9 @@ class BMGNode(RestNode):
             }
 
         else:
-            # thread is not busy, query the device
+            # Thread is not busy, query the device
             try:
-                # collect device state
+                # Collect device state
                 device_state = self.bmg_thread.send_command({"action": "device_state"})
                 if not response["success"]:
                     self.cached_device_state = "unknown"
@@ -115,7 +115,7 @@ class BMGNode(RestNode):
                 self.logger.log_error(f"Error collecting device state: {e}")
 
             try:
-                # collect temperature readings
+                # Collect temperature readings
                 response = self.bmg_thread.send_command({"action": "read_temps"})
                 temps = response["data"]
                 self.cached_temp1 = temps["Temp1"]
@@ -144,52 +144,52 @@ class BMGNode(RestNode):
 
     @action(name="open")
     def open(self) -> None:
-        """Opens the BMG plate tray"""
+        """Opens the BMG plate tray."""
 
-        self.logger.log_info("Opening BMG plate tray")
+        self.logger.log_info("Opening BMG plate tray.")
 
-        # send command to BMG thread
+        # Send command to BMG thread
         response = self.bmg_thread.send_command({"action": "plate_out"})
 
-        # interpret response
+        # Interpret response
         if not response["success"]:
             raise Exception(f"Failed to open BMG plate tray: {response['error']}")
-        self.logger.log_info("BMG plate tray opened")
+        self.logger.log_info("BMG plate tray opened.")
 
     @action(name="close")
     def close(self) -> None:
-        """Closes the BMG plate tray"""
+        """Closes the BMG plate tray."""
 
-        self.logger.log_info("Closing BMG plate tray")
+        self.logger.log_info("Closing BMG plate tray.")
 
-        # send command to BMG thread
+        # Send command to BMG thread
         response = self.bmg_thread.send_command({"action": "plate_in"})
 
-        # interpret response
+        # Interpret response
         if not response["success"]:
             raise Exception(f"Failed to close BMG plate tray: {response['error']}")
-        self.logger.log_info("BMG plate tray closed")
+        self.logger.log_info("BMG plate tray closed.")
 
     @action(name="set_temp")
     def set_temp(self, temp: float) -> None:
-        """Sets the temperature on the BMG microplate reader"""
+        """Sets the temperature on the BMG microplate reader."""
 
         temp = float(temp)
         if temp in {0.0, 0.1} or 25.0 <= temp <= 45.0:
-            # temp input is valid, send the command
+            # Temp input is valid, send the command
             response = self.bmg_thread.send_command(
                 {"action": "set_temp", "temp": temp}
             )
 
-            # interpret response
+            # Interpret response
             if not response["success"]:
                 self.logger.log_error(f"Error setting temperature: {response['error']}")
                 return ActionFailed(
                     errors=[f"Error setting temperature: {response['error']}"]
                 )
             return None
-        # temp input is not valid (fail action, don't put node in error state)
-        return ActionFailed(errors=["Invalid temperature input value"])
+        # Temp input is not valid (fail action, don't put node in error state)
+        return ActionFailed(errors=["Invalid temperature input value."])
 
     @action(name="run_assay")
     def run_assay(
@@ -206,24 +206,19 @@ class BMGNode(RestNode):
     ) -> Annotated[Path, "Data .txt file returned by the BMG microplate reader"]:
         """Runs an assay on the BMG plate reader"""
 
-        # collect and validate the data_directory_path
+        # Collect and validate the data_directory_path
         if data_output_directory_path is None: 
             data_output_directory_path = self.config.data_output_directory_path
         else: 
-            # check that the directory path exists
+            # Check that the directory path exists
             try: 
                 if not Path(data_output_directory_path).is_dir():
                     return ActionFailed(f"data_output_directory_path {data_output_directory_path} is not an existing folder")
             except Exception as e:
                 self.logger.log_error(f"data_directory_output_path is invalid: {e}")
                 return ActionFailed(f"data_directory_output_path is invalid: {e}")
-            
-        # TESTING
-        self.logger.log_debug(f"{data_output_directory_path=}")
 
-        # TESTING
-        self.logger.log_debug("calling bmg thread run command")
-        # run the assay, collect response containting output data file name
+        # Run the assay, collect response containing output data file name
         response = self.bmg_thread.send_command(
             {
                 "action": "run_assay",
@@ -233,12 +228,9 @@ class BMGNode(RestNode):
                 "data_output_file_name": data_output_file_name,
             }
         )
-
-        self.logger.log_debug(f"{response=}")
-
         
-
-        # interpret response
+        # Interpret response
+        self.logger.log_debug(f"{response=}")
         if not response["success"]:
             self.logger.log_error(f"Error running assay: {response['error']}")
             self.logger.log_error(f"response: {response}")

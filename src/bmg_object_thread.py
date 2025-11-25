@@ -16,10 +16,10 @@ class BMGThread(threading.Thread):
     def __init__(self, logger: EventClient = None) -> None:
         """Initializes the BMGThread object"""
         super().__init__(daemon=True)
+
         self.logger = logger or EventClient()
         self.lock = threading.Lock()
 
-        # communication queue
         self.command_queue = queue.Queue()
         self.response_queue = queue.Queue()
         self.shutdown_event = threading.Event()
@@ -29,7 +29,7 @@ class BMGThread(threading.Thread):
     def run(self) -> None:
         """Main thread loop for BMG communication."""
         try:
-            # initialize BMG communication
+            # Initialize BMG communication
             self.bmg = BmgCom(
                 "CLARIOstar",
                 logger=self.logger,
@@ -38,11 +38,11 @@ class BMGThread(threading.Thread):
 
             while not self.shutdown_event.is_set():
                 try:
-                    # wait for command
+                    # Wait for command
                     command = self.command_queue.get(timeout=1)
                     self.logger.log_info(f"Processing command: {command}")
 
-                    # process command
+                    # Process command
                     action = command.get("action")
                     result = {"success": False, "data": None, "error": None}
                     with self.lock:
@@ -67,7 +67,7 @@ class BMGThread(threading.Thread):
                                 result["data"] = device_state
                             elif action == "run_assay":
                                 data_filename = self.bmg.run_assay(
-                                    protocol_name=command.get("protocol_name"),
+                                    assay_name=command.get("protocol_name"),
                                     protocol_database_path=command.get(
                                         "protocol_database_path"
                                     ),
@@ -81,16 +81,15 @@ class BMGThread(threading.Thread):
                                 if data_filename:
                                     result["data"] = data_filename
 
-                                # Don't fail the action if no data is returned
-                                # presumably the data is still backed up on local machine.
+                                """Don't fail the action if no data is returned.
+                                Presumably the data is still backed up on local machine."""
+
                                 result["success"] = True
 
                             else:
                                 result["error"] = f"Unknown action: {action}"
 
                         except Exception as e:
-                            # TESTING 
-                            self.logger.log_error(f"PROCESSING COMMAND FAILED: {e}")
                             result["error"] = str(e)
                             self.logger.log_error(
                                 f"Error processing command {action}: {e}"
@@ -100,15 +99,15 @@ class BMGThread(threading.Thread):
                     self.response_queue.put(result)
 
                 except queue.Empty:
-                    # no command received, loop again
+                    # No command received, loop again
                     continue
 
         except Exception as e:
             self.logger.log_error(f"Error in BMG thread: {e}")
-            return  # Should I be returning here? - kills the thread if there's an error during init?
+            return  
 
         finally:
-            # clean up BMG communication
+            # Clean up BMG communication.
             if self.bmg:
                 try:
                     self.bmg.close_connection()
@@ -119,7 +118,7 @@ class BMGThread(threading.Thread):
 
     def _process_command(self, command: dict) -> dict:
         # TODO: Extract processing from run function here. 
-        # as is, pydantic says the run funtion is too complex. 
+        # as is, pydantic says the run function is too complex. 
         pass
 
     def send_command(self, command: dict, timeout: float = 300.0) -> dict:
@@ -127,10 +126,10 @@ class BMGThread(threading.Thread):
 
         Args:
             command (dict): Command to send to the BMG thread.
-            timeout (float): Time to wait for a response.
+            timeout (float, optional): Time to wait for a response.
 
         Returns:
-            dict: Response from the BMG thread.
+            response (dict): Response from the BMG thread.
         """
 
         self.command_queue.put(command)
@@ -146,7 +145,7 @@ class BMGThread(threading.Thread):
 
     def stop(self) -> None:
         """Signal thread to stop and wait for it to finish."""
-        # close connection to the bmg device
+        # Close connection to the bmg device
         try:
             if self.bmg:
                 self.bmg.close_connection()
@@ -156,9 +155,9 @@ class BMGThread(threading.Thread):
                     "No BMG device connection open, unable to close nonexistent connection."
                 )
         except Exception:
-            self.logger.log_warning("Unable to close connection to bmg device")
+            self.logger.log_warning("Unable to close connection to bmg device.")
 
-        # shut down the thread
+        # Shut down the thread
         self.shutdown_event.set()
         self.join(timeout=5)
 

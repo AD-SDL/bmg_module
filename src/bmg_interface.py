@@ -78,11 +78,13 @@ class BmgCom:
     def set_temp(self, temp: float) -> None:
         """Sets the temperature on the BMG plate reader.
 
-        Allowed values:
-            00.0 = The incubator unit will be switched off.
-            00.1 = Temperature will not be controlled, but will be monitored.
-            25.0 - 45.0 = Incubator will be switched on and new temp value will be set. Can be changed in increments of 0.1 deg C
-            10.0 - 60.0 = This range is ONLY allowed on extended range models. WE DO NOT HAVE THIS
+        Args: 
+            temp (float): Temperature in Celsius
+                Allowed values:
+                    00.0 = The incubator unit will be switched off.
+                    00.1 = Temperature will not be controlled, but will be monitored.
+                    25.0 - 45.0 = Incubator will be switched on and new temp value will be set. Can be changed in increments of 0.1 deg C
+                    10.0 - 60.0 = This range is ONLY allowed on extended range models.
 
         Notes:
             - Will throw error code -20 if temp input is not a valid value.
@@ -95,7 +97,12 @@ class BmgCom:
     def read_temps(self) -> dict:
         """Reads the temperature at three locations in the BMG plate reader
 
-        Returns:
+        Returns: a dictionary of temperature readouts.
+            temps = {
+                "Temp1": (float temperature reading from bottom heating plate)
+                "Temp2": (float temperature reading from top heating plate)
+                "Temp3:" (float temperature reading from optic slide heating plate)
+            }
 
         """
         temps = {}
@@ -107,7 +114,7 @@ class BmgCom:
         temp3 = self.com.GetInfo(temp3_formatted)
 
         try:
-            # convert to floats in celsius
+            # Convert to floats in Celsius
             temp1 = float(temp1) / 10
             temp2 = float(temp2) / 10
             temp3 = float(temp3) / 10
@@ -117,34 +124,47 @@ class BmgCom:
                 "Temp3": temp3,
             }
         except Exception:
-            # Don't do anything except log if temperature collection fails
+            # Don't raise exception if temperature collection fails.
             self.logger.log_error("Error collecting temperatures: {e}")
 
         return temps
 
     def run_assay(
         self,
-        protocol_name: str,
+        assay_name: str,
         protocol_database_path: str,
         data_output_directory_path: str,
         data_output_file_name: Optional[str] = None,
-        plate_id1: int = 1,  # these plate IDs are optional
-        plate_id2: int = 2,  # but why? what do they do?
-        plate_id3: int = 3,  # and why are there three? curious.
+        plate_id1: int = 1,
+        plate_id2: int = 2,
+        plate_id3: int = 3,
     ) -> str:
-        """Runs an assay on the BMG plate reader"""
+        """Runs an assay on the BMG plate reader.
+        
+        Args: 
+            assay_name (str): Name of the assay to run, name matches existing protocol name in SMART Control Software.
+            protocol_database_path (str): Path to directory where assay protocol files are stored.
+            data_output_directory (str): Path to data output directory for bmg data. Must be an existing directory. 
+            data_output_file_name (str, optional): data output file name (ex. "data.txt").
+            plate_id1 (int): Assay will not run without an integer passed in here. It's unclear what this plate_id does.
+            plate_id2 (int): Assay will not run without an integer passed in here. It's unclear what this plate_id does.
+            plate_id3 (int): Assay will not run without an integer passed in here. It's unclear what this plate_id does.
+            
+        Returns: 
+            data_file_path (str): Path to resulting data file. 
+        """
 
-        # give the data file a unique name if no name is specified
+        # Give the data file a unique name if no name is specified
         if not data_output_file_name:
             data_output_file_name = str(int(time.time())) + ".txt"
 
-        # format the data output file name and path
+        # Format the data output file name and path
         data_dir = Path(data_output_directory_path)
         data_file_path = data_dir / data_output_file_name
 
         self.exec(
             "Run",
-            protocol_name,
+            assay_name,
             protocol_database_path,
             data_output_directory_path,
             plate_id1,
@@ -163,25 +183,8 @@ class BmgCom:
     def exec(self, cmd: str, *args: Any) -> None:
         """Executed a command over the established connection with the BMG plate reader"""
         args = (cmd, *args)
-
-        # testing
-        print("status before: ", self.status())
         res = self.com.ExecuteAndWait(args)
-        
-        # TESTING
-        self.logger.log_info(f"Run assay response: {res=}")
-
-        # TESTING
-        if int(res) == -10: 
-            self.logger.log_error("Response of -10 found!!")
-
-      
-        # testing
-        print("status after: ", self.status())
-        # if res:
-        #     raise Exception(f"command {cmd} failed: {res}")
-
-        # Testing 
+        self.logger.log_info(f"exec response: {res}")
         return res
 
 if __name__ == "__main__":
