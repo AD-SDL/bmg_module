@@ -78,7 +78,7 @@ class BmgCom:
     def set_temp(self, temp: float) -> None:
         """Sets the temperature on the BMG plate reader.
 
-        Args: 
+        Args:
             temp (float): Temperature in Celsius
                 Allowed values:
                     00.0 = The incubator unit will be switched off.
@@ -140,18 +140,18 @@ class BmgCom:
         plate_id3: int = 3,
     ) -> str:
         """Runs an assay on the BMG plate reader.
-        
-        Args: 
+
+        Args:
             assay_name (str): Name of the assay to run, name matches existing protocol name in SMART Control Software.
             protocol_database_path (str): Path to directory where assay protocol files are stored.
-            data_output_directory (str): Path to data output directory for bmg data. Must be an existing directory. 
+            data_output_directory (str): Path to data output directory for bmg data. Must be an existing directory.
             data_output_file_name (str, optional): data output file name (ex. "data.txt").
             plate_id1 (int): Assay will not run without an integer passed in here. It's unclear what this plate_id does.
             plate_id2 (int): Assay will not run without an integer passed in here. It's unclear what this plate_id does.
             plate_id3 (int): Assay will not run without an integer passed in here. It's unclear what this plate_id does.
-            
-        Returns: 
-            data_file_path (str): Path to resulting data file. 
+
+        Returns:
+            data_file_path (str): Path to resulting data file.
         """
 
         # Give the data file a unique name if no name is specified
@@ -186,6 +186,7 @@ class BmgCom:
         res = self.com.ExecuteAndWait(args)
         self.logger.log_info(f"exec response: {res}")
         return res
+
 
 if __name__ == "__main__":
     com = BmgCom("CLARIOstar")

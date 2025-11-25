@@ -1,6 +1,7 @@
 """
 REST-based node for BMG microplate readers that interfaces with WEI
 """
+
 from pathlib import Path
 from typing import Annotated, Optional
 
@@ -15,7 +16,6 @@ from madsci.node_module.rest_node_module import RestNode
 from bmg_interface import BmgCom
 from bmg_object_thread import BMGThread
 
-
 """
 TODOs:
 
@@ -28,7 +28,9 @@ TODOs:
 class BMGNodeConfig(RestNodeConfig):
     """Configuration for the BMG node."""
 
-    data_output_directory_path: str = "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
+    data_output_directory_path: str = (
+        "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
+    )
     """Data output directory path for bmg data"""
     db_directory_path: str = "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit"
     """Path to directory where assay protocol files are stored"""
@@ -91,7 +93,7 @@ class BMGNode(RestNode):
         if self.bmg_thread is None:
             self.logger.log_error("BMG thread is not initialized")
             return
-        
+
         if self.bmg_thread.is_busy:
             self.node_state = {
                 "Temp1 (bottom heating plate)": self.cached_temp1,
@@ -106,12 +108,12 @@ class BMGNode(RestNode):
             try:
                 # Collect device state
                 device_state = self.bmg_thread.send_command({"action": "device_state"})
-                if not response["success"]:
+                if not device_state["success"]:
                     self.cached_device_state = "unknown"
-                else: 
+                else:
                     self.cached_device_state = device_state["data"]
-            
-            except Exception as e: 
+
+            except Exception as e:
                 self.logger.log_error(f"Error collecting device state: {e}")
 
             try:
@@ -127,7 +129,7 @@ class BMGNode(RestNode):
                     "Temp2 (top heating plate)": self.cached_temp2,
                     "Temp3 (optic slide heating plate)": self.cached_temp3,
                     "bmg_thead_state": "READY",
-                    "bmg_device_state": self.cached_device_state
+                    "bmg_device_state": self.cached_device_state,
                 }
             except Exception as e:
                 # Do nothing except log the error if state handler doesn't work
@@ -196,9 +198,9 @@ class BMGNode(RestNode):
         self,
         assay_name: str,
         data_output_directory_path: Annotated[
-            Optional[str], 
-            "data output directory path. Path must point to an existing folder. Defaults to 'C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data'"
-        ] = None, 
+            Optional[str],
+            "data output directory path. Path must point to an existing folder. Defaults to 'C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data'",
+        ] = None,
         data_output_file_name: Annotated[
             Optional[str],
             "data output file name (ex. data.txt). Will default to <timestamp>.txt (ex. 1731706249.txt) if no file name is entered.",
@@ -207,13 +209,15 @@ class BMGNode(RestNode):
         """Runs an assay on the BMG plate reader"""
 
         # Collect and validate the data_directory_path
-        if data_output_directory_path is None: 
+        if data_output_directory_path is None:
             data_output_directory_path = self.config.data_output_directory_path
-        else: 
+        else:
             # Check that the directory path exists
-            try: 
+            try:
                 if not Path(data_output_directory_path).is_dir():
-                    return ActionFailed(f"data_output_directory_path {data_output_directory_path} is not an existing folder")
+                    return ActionFailed(
+                        f"data_output_directory_path {data_output_directory_path} is not an existing folder"
+                    )
             except Exception as e:
                 self.logger.log_error(f"data_directory_output_path is invalid: {e}")
                 return ActionFailed(f"data_directory_output_path is invalid: {e}")
@@ -228,7 +232,7 @@ class BMGNode(RestNode):
                 "data_output_file_name": data_output_file_name,
             }
         )
-        
+
         # Interpret response
         self.logger.log_debug(f"{response=}")
         if not response["success"]:

@@ -43,57 +43,7 @@ class BMGThread(threading.Thread):
                     self.logger.log_info(f"Processing command: {command}")
 
                     # Process command
-                    action = command.get("action")
-                    result = {"success": False, "data": None, "error": None}
-                    with self.lock:
-                        try:
-                            if action == "plate_out":
-                                self.bmg.plate_out()
-                                result["success"] = True
-                            elif action == "plate_in":
-                                self.bmg.plate_in()
-                                result["success"] = True
-                            elif action == "set_temp":
-                                temp = command.get("temp")
-                                self.bmg.set_temp(temp=temp)
-                                result["success"] = True
-                            elif action == "read_temps":
-                                temps = self.bmg.read_temps()
-                                result["success"] = True
-                                result["data"] = temps
-                            elif action == "device_state":
-                                device_state = self.bmg.status()
-                                result["success"] = True
-                                result["data"] = device_state
-                            elif action == "run_assay":
-                                data_filename = self.bmg.run_assay(
-                                    assay_name=command.get("protocol_name"),
-                                    protocol_database_path=command.get(
-                                        "protocol_database_path"
-                                    ),
-                                    data_output_directory_path=command.get(
-                                        "data_output_directory_path"
-                                    ),
-                                    data_output_file_name=command.get(
-                                        "data_output_file_name"
-                                    ),
-                                )
-                                if data_filename:
-                                    result["data"] = data_filename
-
-                                """Don't fail the action if no data is returned.
-                                Presumably the data is still backed up on local machine."""
-
-                                result["success"] = True
-
-                            else:
-                                result["error"] = f"Unknown action: {action}"
-
-                        except Exception as e:
-                            result["error"] = str(e)
-                            self.logger.log_error(
-                                f"Error processing command {action}: {e}"
-                            )
+                    result = self._process_command(command=command)
 
                     # Send response back
                     self.response_queue.put(result)
@@ -104,7 +54,7 @@ class BMGThread(threading.Thread):
 
         except Exception as e:
             self.logger.log_error(f"Error in BMG thread: {e}")
-            return  
+            return
 
         finally:
             # Clean up BMG communication.
@@ -117,9 +67,72 @@ class BMGThread(threading.Thread):
                     self.logger.log_error(f"Error closing BMG connection: {e}")
 
     def _process_command(self, command: dict) -> dict:
-        # TODO: Extract processing from run function here. 
-        # as is, pydantic says the run function is too complex. 
-        pass
+        """Process a single command and return the result."""
+        action = command.get("action")
+        result = {"success": False, "data": None, "error": None}
+
+        with self.lock:
+            try:
+                if action == "plate_out":
+                    self.bmg.plate_out()
+                    result["success"] = True
+                elif action == "plate_in":
+                    self.bmg.plate_in()
+                    result["success"] = True
+                elif action == "set_temp":
+                    self._handle_set_temp(command, result)
+                elif action == "read_temps":
+                    self._handle_read_temps(result)
+                elif action == "device_state":
+                    self._handle_device_state(result)
+                elif action == "run_assay":
+                    self._handle_run_assay(command, result)
+                else:
+                    result["error"] = f"Unknown action: {action}"
+
+            except Exception as e:
+                result["error"] = str(e)
+                self.logger.log_error(f"Error processing command {action}: {e}")
+
+        return result
+
+    def _handle_set_temp(self, command: dict, result: dict) -> None:
+        """Handle set_temp command."""
+        temp = command.get("temp")
+        self.bmg.set_temp(temp=temp)
+        result["success"] = True
+
+    def _handle_read_temps(self, result: dict) -> None:
+        """Handle read_temps command."""
+        temps = self.bmg.read_temps()
+        result["success"] = True
+        result["data"] = temps
+
+    def _handle_device_state(self, result: dict) -> None:
+        """Handle device_state command."""
+        device_state = self.bmg.status()
+        result["success"] = True
+        result["data"] = device_state
+
+    def _handle_run_assay(self, command: dict, result: dict) -> None:
+        """Handle run_assay command."""
+        data_filename = self.bmg.run_assay(
+            assay_name=command.get("protocol_name"),
+            protocol_database_path=command.get("protocol_database_path"),
+            data_output_directory_path=command.get("data_output_directory_path"),
+            data_output_file_name=command.get("data_output_file_name"),
+        )
+        if data_filename:
+            result["data"] = data_filename
+        else:
+            self.logger.log_error(
+                "No data_filename returned from _handle_run_assay in bmg_object thread"
+            )
+            self.logger.log_error(f"{data_filename=}")
+
+        # Don't fail the action if no data is returned.
+        # Presumably the data is still backed up on local machine.
+        result["success"] = True
 
     def send_command(self, command: dict, timeout: float = 300.0) -> dict:
         """Send a command to the BMG thread and wait for a response.

@@ -14,21 +14,21 @@ The BMG driver and REST Node can only connect to the device if run with **32-bit
 
 #### Installation
 
-Clone the repository: 
+Clone the repository:
 
     git clone https://github.com/AD-SDL/bmg_module.git
     cd bmg_module
 
-Create a virtual environment with 32-bit python, then activate it. Remember to use your 32-bit python path: 
+Create a virtual environment with 32-bit python, then activate it. Remember to use your 32-bit python path:
 
     python.exe -m venv .venv
     .venv\Scripts\activate
 
-Install the dependencies using pdm or pip: 
+Install the dependencies using pdm or pip:
 
     pdm install
 
-or 
+or
 
     pip install -e .
 
@@ -43,7 +43,7 @@ Inside the bmg_module directory, run the following commands to test connection t
 
 This will print out the current BMG LABTECH Remote Control Version Number if the driver is able to connect correctly to the BMG device.
 
-You can also use the driver in other programs. The example python program below uses the bmg driver to open and close the plate tray, set the temperature, and run an assay named ASSAY_TEST. 
+You can also use the driver in other programs. The example python program below uses the bmg driver to open and close the plate tray, set the temperature, and run an assay named ASSAY_TEST.
 
 When instantiating the bmg_device, the model name must be entered as "CLARIOstar" even if you own a BMG VANTAstar device. Also, be sure to replace the protocol_database_path and data_output_directory values with your correct paths.
 
@@ -89,7 +89,7 @@ Below is an example of a MADSci YAML Workflow file that could interact with the 
 
     name: Test Workflow
 
-    metadata: 
+    metadata:
         author: Casey Stone
         info: Example MADSci workflow for BMG actions
         version: 0.1
@@ -115,5 +115,3 @@ Below is an example of a MADSci YAML Workflow file that could interact with the 
       args:
         assay_name: ASSAY_NAME
         data_output_file_name: ASSAY_DATA.txt
-
-
