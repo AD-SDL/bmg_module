@@ -1,40 +1,51 @@
 # BMG module
 
-A WEI-powered module for controlling BMG Microplate Readers, currently tested with the VANTAstar model.
+A MADSci-powered module for controlling BMG Microplate Readers, currently tested with the VANTAstar model.
 
-Contains a BMG driver (bmg_driver.py) and BMG REST Node (bmg_rest_node.py).
+Contains a BMG driver (bmg_driver.py), BMG Object Thread Class (bmg_object_thread.py), and BMG REST Node (bmg_rest_node.py).
 
 ### Assay Setup on BMG microplate reader
 
-In order to run an assay on the BMG plate reader, you first need to create the assay using the BMG Smart Control software (not the Voyager software). Once the assay is created and saved, it needs to be exported and the .TCS file should be placed inside the BMG directory that contains the assay database .db file ("C:\Program Files (x86)\BMG\CLARIOstar\User\Definit" with default BMG Smart Control on Windows). Once the .TCS file for your assay has been saved into the database directory, it can be accessed by our BMG driver and REST Node by assay name.
+To run an assay on the BMG plate reader, you first need to create the assay using the BMG SMART Control software (not the Voyager software). Once the assay is created and saved, it needs to be exported and the .TCS file should be placed inside the BMG directory that contains the assay database .db file ("C:\Program Files (x86)\BMG\CLARIOstar\User\Definit" with default BMG Smart Control on Windows). Once the .TCS file for your assay has been saved into the database directory, it can be accessed by our BMG driver and REST Node by assay name.
 
 ### Running instructions
 
-The BMG driver and REST Node can only connect to the device if run with **32-bit python**. In the following commands, be sure that you're running the correct python version, replacing 'python' with the complete path to your 32-bit python .exe file if necessary.
+The BMG driver and REST Node can only connect to the device if run with **32-bit python**. When creating your python virtual environment in the commands below, replace 'python.exe' with your path to a 32-bit python executable.
 
 #### Installation
 
-When running the last line of these install instructions, be sure to pip install using your 32-bit python. An example of how to do this is below but make sure to replace python.exe with the path to your 32-bit python .exe.
-
-    python.exe -m pip install -e .
-
-General install instructions:
+Clone the repository: 
 
     git clone https://github.com/AD-SDL/bmg_module.git
     cd bmg_module
+
+Create a virtual environment with 32-bit python, then activate it. Remember to use your 32-bit python path: 
+
+    python.exe -m venv .venv
+    .venv\Scripts\activate
+
+Install the dependencies using pdm or pip: 
+
+    pdm install
+
+or 
+
     pip install -e .
 
-If you're having trouble installing the requirements or wei due to an issue installing httptools, use the Visual Studio Installer (download this if you don't have it already), and either modify or install Visual Studio Community 2022 to include "Desktop development with C++".
+If you're having trouble installing the requirements or MADSci due to an issue installing httptools, use the Visual Studio Installer (download this if you don't have it already), and either modify or install Visual Studio Community 2022 to include "Desktop development with C++".
 
-#### Running the driver
+#### Running the interface
 
-    cd bmg_module
+Inside the bmg_module directory, run the following commands to test connection to the BMG device through the BMG interface.
+
     cd src
     python bmg_driver.py
 
 This will print out the current BMG LABTECH Remote Control Version Number if the driver is able to connect correctly to the BMG device.
 
-You can also use the driver in other programs. See the below python program uses the bmg driver to open and close the plate tray, then sets the temperature and runs an assay named ASSAY_TEST. When connecting, the model must be CLARIOstar even when using a VANTAstar model.
+You can also use the driver in other programs. The example python program below uses the bmg driver to open and close the plate tray, set the temperature, and run an assay named ASSAY_TEST. 
+
+When instantiating the bmg_device, the model name must be entered as "CLARIOstar" even if you own a BMG VANTAstar device. Also, be sure to replace the protocol_database_path and data_output_directory values with your correct paths.
 
     import bmg_interface
 
@@ -46,61 +57,63 @@ You can also use the driver in other programs. See the below python program uses
         protocol_name = "ASSAY_NAME",
         protocol_database_path = "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" ,
         data_output_directory = "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data",
-        data_output_file_name = "assya_data.txt",
+        data_output_file_name = "assay_data.txt",
     )
-
-Be sure to replace the protocol_database_path and data_output_directory with your correct paths.
 
 
 #### Running the REST Node
 
 The REST Node can be started with a command in the format below
 
-    python.exe bmg_rest_node.py --port <your_port> --db_directory_path <(optional) path to bmg db directory containing assay .TCS files> --output_path <(optional) path to directory for saving data output files>
+    python bmg_rest_node.py --node_url <(str, optional) address for your LiCONiC MADSci REST Node> --db_directory_path <(str, optional) path to bmg db directory containing assay .TCS files> --output_path <(str, optional) path to directory for saving data output files>
+
+--node_url will default to "http://127.0.0.1:2000" \
+--db_directory_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" \
+and -- output_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
+
+Example usage with no optional arguments:
 
 
---db_directory_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" unless specified \
-and -- output_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data" unless specified.
-
-Example usage with no optional arguments (remember to use 32-bit python):
-
-
-    python.exe bmg_rest_node.py --port 3003
+    python bmg_rest_node.py
 
 
 Example usage with all optional arguments:
 
 
-    python.exe bmg_rest_node.py --port 3003 --db_directory_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" --output_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
+    python bmg_rest_node.py --node_url "http://127.0.0.1:3003" --db_directory_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" --output_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
 
 
-### Example Usage in WEI Workflow YAML file
+### Example Usage in MADSci Workflow YAML file
 
-Below is an example of a YAML WEI Workflow file that could interact with the BMG REST Node.
+Below is an example of a MADSci YAML Workflow file that could interact with the BMG REST Node. Replace "ASSAY_NAME" and "ASSAY_DATA.txt" with the name of the assay you wish to run on the BMG and file name for the output data.
 
-    name: BMG Example
-    author: RPL
-    info: An example WEI workflow to show available BMG actions
-    version: '0.1'
+    name: Test Workflow
 
-    flowdef:
-    - name: open bmg
-      module: bmg
+    metadata: 
+        author: Casey Stone
+        info: Example MADSci workflow for BMG actions
+        version: 0.1
+
+    steps:
+    - name: open BMG
+      node: bmg
       action: open
 
     - name: close bmg
-      module: bmg
+      node: bmg
       action: close
 
     - name: set temp
-      module: bmg
+      node: bmg
       action: set_temp
       args:
         temp: 30.0
 
     - name: Run bmg
-      module: bmg
+      node: bmg
       action: run_assay
       args:
-        assay_name: Assay_name
-        data_output_file_name: assay_data.txt
+        assay_name: ASSAY_NAME
+        data_output_file_name: ASSAY_DATA.txt
+
+
