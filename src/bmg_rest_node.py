@@ -7,9 +7,7 @@ from typing import Annotated, Optional
 
 from madsci.common.types.action_types import ActionFailed
 from madsci.common.types.node_types import RestNodeConfig
-from madsci.common.types.resource_types import (
-    Slot,
-)
+from madsci.common.types.resource_types import Slot
 from madsci.node_module.helpers import action
 from madsci.node_module.rest_node_module import RestNode
 
@@ -86,6 +84,20 @@ class BMGNode(RestNode):
             template_name="bmg.nest",
             resource_name=f"{self.node_definition.node_name}.nest",
         )
+
+    def collect_current_plate_resource(self) -> str:
+        """Collects the resource ID of the labware in the BMG Plate Nest according to the Resource Manager"""
+        assay_plate_resource_id = None
+        try:
+            child_resource = self.resource_client.get_resource(self.plate_carrier).child
+            assay_plate_resource_id = (
+                child_resource.resource_id if child_resource else None
+            )
+        except Exception as e:
+            # Don't fail the action if the child resource ID cannot be collected
+            self.logger.log_error(e)
+
+        return assay_plate_resource_id
 
     def state_handler(self) -> None:
         """Periodically check state of BMG device"""
@@ -205,8 +217,11 @@ class BMGNode(RestNode):
             Optional[str],
             "data output file name (ex. data.txt). Will default to <timestamp>.txt (ex. 1731706249.txt) if no file name is entered.",
         ] = None,
-    ) -> Annotated[Path, "Data .txt file returned by the BMG microplate reader"]:
+    ) -> Annotated[tuple[Path, str], "Returns (data file path, assay plate ID)"]:
         """Runs an assay on the BMG plate reader"""
+
+        # Collect the resource ID of the assay plate in the BMG reader, if any. None if no assay plate present according to resource manager.
+        assay_plate_id = self.collect_current_plate_resource()
 
         # Collect and validate the data_directory_path
         if data_output_directory_path is None:
@@ -239,7 +254,9 @@ class BMGNode(RestNode):
             self.logger.log_error(f"Error running assay: {response['error']}")
             self.logger.log_error(f"response: {response}")
             return ActionFailed(errors=[f"Error running assay: {response['error']}"])
-        return Path(response["data"])
+
+        # return the path to the data file and the associated labware id (or None)
+        return (Path(response["data"]), assay_plate_id)
 
 
 if __name__ == "__main__":
