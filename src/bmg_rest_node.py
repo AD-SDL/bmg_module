@@ -18,12 +18,13 @@ from bmg_object_thread import BMGThread
 class BMGNodeConfig(RestNodeConfig):
     """Configuration for the BMG node."""
 
-    # TODO: TEST CONVERSION TO PATH TYPE HERE!
     data_output_directory_path: Path = Path(
         "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
     )
     """Data output directory path for bmg data"""
-    db_directory_path: Path = Path("C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit")
+    db_directory_path: Path = Path(
+        "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit"
+    )
     """Path to directory where assay protocol files are stored"""
     state_update_interval: Optional[float] = 5.0
     """Interval for updating module state in seconds"""

@@ -84,7 +84,7 @@ class BmgCom:
                     00.0 = The incubator unit will be switched off.
                     00.1 = Temperature will not be controlled, but will be monitored.
                     25.0 - 45.0 = Incubator will be switched on and new temp value will be set. Can be changed in increments of 0.1 deg C
-                    10.0 - 60.0 = This range is ONLY allowed on extended range models. 
+                    10.0 - 60.0 = This range is ONLY allowed on extended range models.
 
         Notes:
             - Will throw error code -20 if temp input is not a valid value.
@@ -92,9 +92,11 @@ class BmgCom:
             - If more than one decimal point are included, will round to nearest valid temp input.
         """
         # Check that temperature input is valid (Outer range checked. Valid temp range varies by device model.). # TODO: TEST!
-        if not 10.0 <= temp <= 60.0 or temp == 0.0 or temp == 0.1: 
-            raise ValueError("Temp argument must be a valid float between 10.0 and 60.0, or equal to 0.0 or 0.1")
-        
+        if not 10.0 <= temp <= 60.0 or temp in [0.0, 0.1]:
+            raise ValueError(
+                "Temp argument must be a valid float between 10.0 and 60.0, or equal to 0.0 or 0.1"
+            )
+
         nominal_temp = str(temp)
         self.exec("Temp", nominal_temp)
 
@@ -176,7 +178,7 @@ class BmgCom:
             data_output_file_name,
         )
         self.logger.log_info(f"Run action response: {response}")
-        
+
         return data_file_path
 
     def is_busy(self) -> bool:
