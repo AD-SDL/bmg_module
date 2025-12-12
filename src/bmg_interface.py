@@ -1,5 +1,5 @@
 """
-Driver for the BMG microplate reader (our model is VANTAstar)
+Python Driver for the BMG Microplate Reader (our model is BMG VANTAstar)
 """
 
 import ctypes
@@ -31,14 +31,14 @@ class BmgCom:
             self.open_connection()
 
     def open_connection(self) -> None:
-        """Open a connection to the BMG plate reader"""
+        """Opens a connection to the BMG plate reader"""
         ep = ctypes.c_char_p(self.control_name.encode("ascii"))
         res = self.com.OpenConnection(ep)
         if res:
             raise Exception(f"OpenConnection failed: {res}")
 
     def close_connection(self) -> None:
-        """Close the connection to the BMG plate reader"""
+        """Closes the connection to the BMG plate reader"""
         res = self.com.CloseConnection()
         if res:
             raise Exception(f"CloseConnection failed: {res}")
@@ -84,13 +84,17 @@ class BmgCom:
                     00.0 = The incubator unit will be switched off.
                     00.1 = Temperature will not be controlled, but will be monitored.
                     25.0 - 45.0 = Incubator will be switched on and new temp value will be set. Can be changed in increments of 0.1 deg C
-                    10.0 - 60.0 = This range is ONLY allowed on extended range models.
+                    10.0 - 60.0 = This range is ONLY allowed on extended range models. 
 
         Notes:
             - Will throw error code -20 if temp input is not a valid value.
             - Temp must be a float to be valid.
             - If more than one decimal point are included, will round to nearest valid temp input.
         """
+        # Check that temperature input is valid (Outer range checked. Valid temp range varies by device model.). # TODO: TEST!
+        if not 10.0 <= temp <= 60.0 or temp == 0.0 or temp == 0.1: 
+            raise ValueError("Temp argument must be a valid float between 10.0 and 60.0, or equal to 0.0 or 0.1")
+        
         nominal_temp = str(temp)
         self.exec("Temp", nominal_temp)
 
@@ -103,7 +107,6 @@ class BmgCom:
                 "Temp2": (float temperature reading from top heating plate)
                 "Temp3:" (float temperature reading from optic slide heating plate)
             }
-
         """
         temps = {}
         temp1_formatted = ctypes.c_char_p(b"Temp1")
@@ -153,7 +156,6 @@ class BmgCom:
         Returns:
             data_file_path (str): Path to resulting data file.
         """
-
         # Give the data file a unique name if no name is specified
         if not data_output_file_name:
             data_output_file_name = str(int(time.time())) + ".txt"
@@ -162,7 +164,7 @@ class BmgCom:
         data_dir = Path(data_output_directory_path)
         data_file_path = data_dir / data_output_file_name
 
-        self.exec(
+        response = self.exec(
             "Run",
             assay_name,
             protocol_database_path,
@@ -173,7 +175,8 @@ class BmgCom:
             data_output_directory_path,
             data_output_file_name,
         )
-
+        self.logger.log_info(f"Run action response: {response}")
+        
         return data_file_path
 
     def is_busy(self) -> bool:
@@ -183,9 +186,9 @@ class BmgCom:
     def exec(self, cmd: str, *args: Any) -> None:
         """Executed a command over the established connection with the BMG plate reader"""
         args = (cmd, *args)
-        res = self.com.ExecuteAndWait(args)
-        self.logger.log_info(f"exec response: {res}")
-        return res
+        response = self.com.ExecuteAndWait(args)
+        self.logger.log_info(f"exec response: {response}")
+        return response
 
 
 if __name__ == "__main__":

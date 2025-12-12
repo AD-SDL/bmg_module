@@ -14,23 +14,16 @@ from madsci.node_module.rest_node_module import RestNode
 from bmg_interface import BmgCom
 from bmg_object_thread import BMGThread
 
-"""
-TODOs:
-
-- Something is wrong with passing paths in through the command line args. Only works when default paths are set in BMGNodeConfig
-     TASK: make these into Path types, not string and test. Probably the double slash when passing in string is the issue
-
-"""
-
 
 class BMGNodeConfig(RestNodeConfig):
     """Configuration for the BMG node."""
 
-    data_output_directory_path: str = (
+    # TODO: TEST CONVERSION TO PATH TYPE HERE!
+    data_output_directory_path: Path = Path(
         "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
     )
     """Data output directory path for bmg data"""
-    db_directory_path: str = "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit"
+    db_directory_path: Path = Path("C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit")
     """Path to directory where assay protocol files are stored"""
     state_update_interval: Optional[float] = 5.0
     """Interval for updating module state in seconds"""
@@ -191,6 +184,7 @@ class BMGNode(RestNode):
         temp = float(temp)
         if temp in {0.0, 0.1} or 25.0 <= temp <= 45.0:
             # Temp input is valid, send the command
+            # NOTE: These temp values are specific to our model of BMG Plate Reader (VANTAStar)
             response = self.bmg_thread.send_command(
                 {"action": "set_temp", "temp": temp}
             )
