@@ -1,16 +1,18 @@
-# BMG module
+# BMG Module
 
-A MADSci-powered module for controlling BMG Microplate Readers, currently tested with the VANTAstar model.
+A MADSci-powered module for controlling BMG microplate readers, currently tested with the VANTAstar model.
 
 Contains a BMG driver (bmg_driver.py), BMG Object Thread Class (bmg_object_thread.py), and BMG REST Node (bmg_rest_node.py).
 
-### Assay Setup on BMG microplate reader
+### Assay Setup on a BMG Microplate Reader
 
-To run an assay on the BMG plate reader, you first need to create the assay using the BMG SMART Control software (not the Voyager software). Once the assay is created and saved, it needs to be exported and the .TCS file should be placed inside the BMG directory that contains the assay database .db file ("C:\Program Files (x86)\BMG\CLARIOstar\User\Definit" with default BMG Smart Control on Windows). Once the .TCS file for your assay has been saved into the database directory, it can be accessed by our BMG driver and REST Node by assay name.
+To run an assay on the BMG plate reader, you must first create the assay using the BMG SMART Control software (not the Voyager software). Once the assay is created and saved, it must be exported, and the .TCS file should be placed inside the BMG directory that contains the assay database .db file ("C:\Program Files (x86)\BMG\CLARIOstar\User\Definit" with default BMG SMART Control on Windows). 
 
-### Running instructions
+Once the .TCS file for your assay has been saved into the database directory, it can be accessed by the BMG driver and REST Node by assay name.
 
-The BMG driver and REST Node can only connect to the device if run with **32-bit python**. When creating your python virtual environment in the commands below, replace 'python.exe' with your path to a 32-bit python executable.
+### Running Instructions
+
+The BMG driver and REST Node can only connect to the device when run with **32-bit Python**. When creating your Python virtual environment in the commands below, replace 'python.exe' with the path to a 32-bit Python executable.
 
 #### Installation
 
@@ -19,12 +21,12 @@ Clone the repository:
     git clone https://github.com/AD-SDL/bmg_module.git
     cd bmg_module
 
-Create a virtual environment with 32-bit python, then activate it. Remember to use your 32-bit python path:
+Create a virtual environment with 32-bit Python, then activate it. Be sure to use your 32-bit Python path:
 
     python.exe -m venv .venv
     .venv\Scripts\activate
 
-Install the dependencies using pdm or pip:
+Install the dependencies using PDM or pip:
 
     pdm install
 
@@ -32,18 +34,18 @@ or
 
     pip install -e .
 
-If you're having trouble installing the requirements or MADSci due to an issue installing httptools, use the Visual Studio Installer (download this if you don't have it already), and either modify or install Visual Studio Community 2022 to include "Desktop development with C++".
+If you're having trouble installing the requirements or MADSci due to an issue installing httptools, use the Visual Studio Installer (download it if you do not already have it), and either modify or install Visual Studio Community 2022 to include Desktop development with C++.
 
 #### Running the interface
 
-Inside the bmg_module directory, run the following commands to test connection to the BMG device through the BMG interface.
+Inside the bmg_module directory, run the following commands to test the connection to the BMG device through the BMG interface.
 
     cd src
     python bmg_interface.py
 
-This will print out the current BMG LABTECH Remote Control Version Number if the driver is able to connect correctly to the BMG device.
+This will print the current BMG LABTECH Remote Control version number if the driver is able to connect successfully to the BMG device.
 
-You can also use the driver in other programs. The example python program below uses the bmg driver to open and close the plate tray, set the temperature, and run an assay named ASSAY_NAME.
+You can also use the driver in other programs. The example Python program below uses the BMG driver to open and close the plate tray, set the temperature, and run an assay named ASSAY_NAME.
 
 When instantiating the bmg_device, the model name must be entered as "CLARIOstar" even if you own a BMG VANTAstar device. Also, be sure to replace the protocol_database_path and data_output_directory values with your correct paths.
 
@@ -85,7 +87,7 @@ Example usage with all optional arguments:
 
 ### Example Usage in MADSci Workflow YAML file
 
-Below is an example of a MADSci YAML Workflow file that could interact with the BMG REST Node. Replace "ASSAY_NAME" and "ASSAY_DATA.txt" with the name of the assay you wish to run on the BMG and file name for the output data.
+Below is an example of a MADSci YAML workflow file that interacts with the BMG REST Node. Replace "ASSAY_NAME" and "ASSAY_DATA.txt" with the name of the assay you wish to run on the BMG and the desired output data file name.
 
     name: Test Workflow
 
