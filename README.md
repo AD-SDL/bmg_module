@@ -39,11 +39,11 @@ If you're having trouble installing the requirements or MADSci due to an issue i
 Inside the bmg_module directory, run the following commands to test connection to the BMG device through the BMG interface.
 
     cd src
-    python bmg_driver.py
+    python bmg_interface.py
 
 This will print out the current BMG LABTECH Remote Control Version Number if the driver is able to connect correctly to the BMG device.
 
-You can also use the driver in other programs. The example python program below uses the bmg driver to open and close the plate tray, set the temperature, and run an assay named ASSAY_TEST.
+You can also use the driver in other programs. The example python program below uses the bmg driver to open and close the plate tray, set the temperature, and run an assay named ASSAY_NAME.
 
 When instantiating the bmg_device, the model name must be entered as "CLARIOstar" even if you own a BMG VANTAstar device. Also, be sure to replace the protocol_database_path and data_output_directory values with your correct paths.
 
@@ -63,7 +63,7 @@ When instantiating the bmg_device, the model name must be entered as "CLARIOstar
 
 #### Running the REST Node
 
-The REST Node can be started with a command in the format below
+The REST Node can be started with a command in the format below.
 
     python bmg_rest_node.py --node_url <(str, optional) address for your LiCONiC MADSci REST Node> --db_directory_path <(str, optional) path to bmg db directory containing assay .TCS files> --output_path <(str, optional) path to directory for saving data output files>
 

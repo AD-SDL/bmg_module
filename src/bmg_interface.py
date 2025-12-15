@@ -91,7 +91,7 @@ class BmgCom:
             - Temp must be a float to be valid.
             - If more than one decimal point are included, will round to nearest valid temp input.
         """
-        # Check that temperature input is valid (Outer range checked. Valid temp range varies by device model.). # TODO: TEST!
+        # Check that temperature input is valid (Outer range checked. Valid temp range varies by device model.)
         if not 10.0 <= temp <= 60.0 or temp in [0.0, 0.1]:
             raise ValueError(
                 "Temp argument must be a valid float between 10.0 and 60.0, or equal to 0.0 or 0.1"
