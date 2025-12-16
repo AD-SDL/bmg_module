@@ -6,7 +6,7 @@ Contains a BMG driver (bmg_driver.py), BMG Object Thread Class (bmg_object_threa
 
 ### Assay Setup on a BMG Microplate Reader
 
-To run an assay on the BMG plate reader, you must first create the assay using the BMG SMART Control software (not the Voyager software). Once the assay is created and saved, it must be exported, and the .TCS file should be placed inside the BMG directory that contains the assay database .db file ("C:\Program Files (x86)\BMG\CLARIOstar\User\Definit" with default BMG SMART Control on Windows). 
+To run an assay on the BMG plate reader, you must first create the assay using the BMG SMART Control software (not the Voyager software). Once the assay is created and saved, it must be exported, and the .TCS file should be placed inside the BMG directory that contains the assay database .db file ("C:\Program Files (x86)\BMG\CLARIOstar\User\Definit" with default BMG SMART Control on Windows).
 
 Once the .TCS file for your assay has been saved into the database directory, it can be accessed by the BMG driver and REST Node by assay name.
 
