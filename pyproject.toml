@@ -1,7 +1,7 @@
 [project]
 name = "bmg_module"
 version = "1.1.0"
-description = "Software for automatting a BMG VANTAstar"
+description = "Software for automating a BMG VANTAstar with MADSci"
 authors = [
     {name = "Casey Stone", email="cstone@anl.gov"},
     {name = "Ryan D. Lewis", email="ryan.lewis@anl.gov"},
