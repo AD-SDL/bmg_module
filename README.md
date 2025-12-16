@@ -12,7 +12,7 @@ Once the .TCS file for your assay has been saved into the database directory, it
 
 ### Running Instructions
 
-The BMG driver and REST Node can only connect to the device when run with **32-bit Python**. When creating your Python virtual environment in the commands below, replace 'python.exe' with the path to a 32-bit Python executable.
+The BMG driver and REST Node can only connect to the device when run with **32-bit Python** on a Windows machine. When creating your Python virtual environment in the commands below, replace 'python.exe' with the path to a 32-bit Python executable.
 
 #### Installation
 
@@ -36,7 +36,7 @@ or
 
 If you're having trouble installing the requirements or MADSci due to an issue installing httptools, use the Visual Studio Installer (download it if you do not already have it), and either modify or install Visual Studio Community 2022 to include Desktop development with C++.
 
-#### Running the interface
+#### Running the Interface
 
 Inside the bmg_module directory, run the following commands to test the connection to the BMG device through the BMG interface.
 
@@ -71,7 +71,7 @@ The REST Node can be started with a command in the format below.
 
 --node_url will default to "http://127.0.0.1:2000" \
 --db_directory_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" \
-and -- output_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
+and --output_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
 
 Example usage with no optional arguments:
 
