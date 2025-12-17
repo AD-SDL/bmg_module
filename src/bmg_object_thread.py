@@ -110,7 +110,7 @@ class BMGThread(threading.Thread):
 
     def _handle_device_state(self, result: dict) -> None:
         """Handle device_state command."""
-        device_state = self.bmg.status()
+        device_state = self.bmg.get_status()
         result["success"] = True
         result["data"] = device_state
 

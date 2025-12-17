@@ -27,8 +27,7 @@ class BmgCom:
 
         pythoncom.CoInitialize()
         self.com = comtypes.client.CreateObject("BMG_ActiveX.BMGRemoteControl")
-        if control_name:
-            self.open_connection()
+        self.open_connection()
 
     def open_connection(self) -> None:
         """Opens a connection to the BMG plate reader"""
@@ -43,21 +42,17 @@ class BmgCom:
         if res:
             raise Exception(f"CloseConnection failed: {res}")
 
-    def version(self) -> str:
+    def get_version(self) -> str:
         """Returns the BMG instrument version"""
         return self.com.GetVersion()
 
-    def dummy(self) -> None:
-        """Use this to test if a connection to a BMG plate reader is active"""
-        self.exec("Dummy")
-
-    def status(self) -> str:
+    def get_status(self) -> str:
         """Returns the current status of the BMG plate reader"""
         item = ctypes.c_char_p(b"Status")
         status = self.com.GetInfo(item)
         return status.strip() if isinstance(status, str) else "unknown"
 
-    def error(self) -> str:
+    def get_error(self) -> str:
         """Returns any errors on the BMG plate reader"""
         item = ctypes.c_char_p(b"Error")
         status = self.com.GetInfo(item)
@@ -65,15 +60,15 @@ class BmgCom:
 
     def init(self) -> None:
         """Initializes the BMG plate reader"""
-        self.exec("Init")
+        self._exec("Init")
 
     def plate_in(self) -> None:
         """Closes the plate tray on the BMG plate reader"""
-        self.exec("PlateIn")
+        self._exec("PlateIn")
 
     def plate_out(self) -> None:
         """Opens the plate tray on the BMG plate reader"""
-        self.exec("PlateOut")
+        self._exec("PlateOut")
 
     def set_temp(self, temp: float) -> None:
         """Sets the temperature on the BMG plate reader.
@@ -87,7 +82,7 @@ class BmgCom:
                     10.0 - 60.0 = This range is ONLY allowed on extended range models.
 
         Notes:
-            - Will throw error code -20 if temp input is not a valid value.
+            - Will throw get_ code -20 if temp input is not a valid value.
             - Temp must be a float to be valid.
             - If more than one decimal point are included, will round to nearest valid temp input.
         """
@@ -98,7 +93,7 @@ class BmgCom:
             )
 
         nominal_temp = str(temp)
-        self.exec("Temp", nominal_temp)
+        self._exec("Temp", nominal_temp)
 
     def read_temps(self) -> dict:
         """Reads the temperature at three locations in the BMG plate reader
@@ -129,7 +124,9 @@ class BmgCom:
                 "Temp3": temp3,
             }
         except Exception:
-            # Don't raise exception if temperature collection fails.
+            """Do not raise an exception if temperature collection fails.
+            Any running action should continue, regardless of whether this
+            temperature collection is successful."""
             self.logger.log_error("Error collecting temperatures: {e}")
 
         return temps
@@ -166,7 +163,7 @@ class BmgCom:
         data_dir = Path(data_output_directory_path)
         data_file_path = data_dir / data_output_file_name
 
-        response = self.exec(
+        response = self._exec(
             "Run",
             assay_name,
             protocol_database_path,
@@ -185,7 +182,7 @@ class BmgCom:
         """Returns True if BMG is busy, False if not busy"""
         return bool(self.lock.locked())
 
-    def exec(self, cmd: str, *args: Any) -> None:
+    def _exec(self, cmd: str, *args: Any) -> None:
         """Executed a command over the established connection with the BMG plate reader"""
         args = (cmd, *args)
         response = self.com.ExecuteAndWait(args)
@@ -195,4 +192,4 @@ class BmgCom:
 
 if __name__ == "__main__":
     com = BmgCom("CLARIOstar")
-    print(f"BMG LABTECH Remote Control Version: {com.version()}")  # noqa: T201
+    print(f"BMG LABTECH Remote Control Version: {com.get_version()}")  # noqa: T201
