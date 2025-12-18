@@ -2,7 +2,7 @@
 REST-based node for BMG microplate readers that interfaces with WEI
 """
 
-from pathlib import Path, WindowsPath
+from pathlib import Path
 from typing import Annotated, Optional
 
 from madsci.common.types.action_types import ActionFailed
@@ -10,7 +10,6 @@ from madsci.common.types.node_types import RestNodeConfig
 from madsci.common.types.resource_types import Slot
 from madsci.node_module.helpers import action
 from madsci.node_module.rest_node_module import RestNode
-from pydantic.json_schema import SkipJsonSchema
 
 from bmg_interface import BmgCom
 from bmg_object_thread import BMGThread
@@ -19,13 +18,11 @@ from bmg_object_thread import BMGThread
 class BMGNodeConfig(RestNodeConfig):
     """Configuration for the BMG node."""
 
-    data_output_directory_path: SkipJsonSchema[WindowsPath] = WindowsPath(
+    data_output_directory_path: Path = Path(
         "C:/Program Files (x86)/BMG/CLARIOstar/User/Data"
     )
     """Data output directory path for bmg data"""
-    db_directory_path: SkipJsonSchema[WindowsPath] = WindowsPath(
-        "C:/Program Files (x86)/BMG/CLARIOstar/User/Definit"
-    )
+    db_directory_path: Path = Path("C:/Program Files (x86)/BMG/CLARIOstar/User/Definit")
     state_update_interval: Optional[float] = 5.0
     """Interval for updating module state in seconds"""
     extended_temperature_range_model: bool = False
@@ -48,6 +45,7 @@ class BMGNode(RestNode):
         self.cached_temp2 = None
         self.cached_temp3 = None
         self.cached_device_state = None
+        self.cached_current_errors = None
 
     def startup_handler(self) -> None:
         """Called to (re)initialize the node. Should be used to open connections to devices or initialize any other resources."""
@@ -103,6 +101,7 @@ class BMGNode(RestNode):
             self.logger.log_error("BMG thread is not initialized")
             return
 
+        # If the BMG device is busy, report cached values.
         if self.bmg_thread.is_busy:
             self.node_state = {
                 "Temp1 (bottom heating plate)": self.cached_temp1,
@@ -110,18 +109,18 @@ class BMGNode(RestNode):
                 "Temp3 (optic slide heating plate)": self.cached_temp3,
                 "bmg_thread_state": "BUSY",
                 "bmg_device_state": "busy",
+                "errors": self.cached_current_errors,
             }
 
+        # If the BMG device is not busy, query for new state values.
         else:
-            # Thread is not busy, query the device
+            # Collect device state
             try:
-                # Collect device state
                 device_state = self.bmg_thread.send_command({"action": "device_state"})
                 if not device_state["success"]:
                     self.cached_device_state = "unknown"
                 else:
                     self.cached_device_state = device_state["data"]
-
             except Exception as e:
                 """Do nothing except log the error if collecting device state in the
                 state handler doesn't work. We want any running actions to continue or
@@ -129,13 +128,25 @@ class BMGNode(RestNode):
                 of our ability to collect this device state data."""
                 self.logger.log_error(f"Error collecting device state: {e}")
 
-            """Log if the device returns that it is in an Error state.
-            This doesn't stop  """
+            # Collect any error messages if device is in an error state
             if self.cached_device_state == "Error":
                 self.logger.log_warning("Device is in an Error state.")
+                try:
+                    self.cached_current_errors = self.bmg_thread.send_command(
+                        {"action": "read_error"}
+                    )["data"]
+                except Exception as e:
+                    """Do nothing except log the error if the the device error messages cannot
+                    be collected. Error messages on the device often do not prevent the device
+                    from running the next action."""
+                    self.logger.log_warning(
+                        f"Error collecting current device errors: {e}"
+                    )
+            else:
+                self.cached_current_errors = None
 
+            # Collect temperature readings
             try:
-                # Collect temperature readings
                 response = self.bmg_thread.send_command({"action": "read_temps"})
                 temps = response["data"]
                 self.cached_temp1 = temps["Temp1"]
@@ -148,6 +159,7 @@ class BMGNode(RestNode):
                     "Temp3 (optic slide heating plate)": self.cached_temp3,
                     "bmg_thead_state": "READY",
                     "bmg_device_state": self.cached_device_state,
+                    "errors": self.cached_current_errors,
                 }
             except Exception as e:
                 """Do nothing except log the error if collecting temperatures in the
@@ -212,19 +224,22 @@ class BMGNode(RestNode):
 
         if temp in {0.0, 0.1} or min_temp <= temp <= max_temp:
             # Temp input is valid, send the command
-            response = self.bmg_thread.send_command(
-                {"action": "set_temp", "temp": temp}
-            )
-
-            # Interpret response
-            if not response["success"]:
-                self.logger.log_error(f"Error setting temperature: {response['error']}")
-                return ActionFailed(
-                    errors=[f"Error setting temperature: {response['error']}"]
+            try:
+                response = self.bmg_thread.send_command(
+                    {"action": "set_temp", "temp": temp}
                 )
-            return None
-        # Temp input is not valid (fail action, don't put node in error state)
-        return ActionFailed(errors=["Invalid temperature input value."])
+                # Interpret response
+                if response["success"]:
+                    return None
+                return ActionFailed(errors=response["error"])
+            except Exception as e:
+                self.logger.log_error(f"Exception raised from set_temp action: {e}")
+                return ActionFailed(
+                    errors=f"Exception raised from set_temp action: {e}"
+                )
+        else:
+            # Temp input is not valid (fail action, don't put node in error state)
+            return ActionFailed(errors=["Invalid temperature input value."])
 
     @action(name="run_assay")
     def run_assay(
@@ -250,7 +265,7 @@ class BMGNode(RestNode):
         else:
             # Check that the directory path exists
             try:
-                if not WindowsPath(data_output_directory_path).is_dir():
+                if not Path(data_output_directory_path).is_dir():
                     return ActionFailed(
                         f"data_output_directory_path {data_output_directory_path} is not an existing folder"
                     )
@@ -269,24 +284,15 @@ class BMGNode(RestNode):
                     "data_output_file_name": data_output_file_name,
                 }
             )
+            # Interpret response
+            if response["success"]:
+                return (Path(response["data"]), assay_plate_id)
+            self.logger.log_error(f"Error running assay. {response=}")
+            return ActionFailed(errors=[f"Error running assay. {response=}"])
+
         except Exception as e:
             self.logger.log_error(f"Error running assay in REST Node. {e}")
             return ActionFailed(errors=[f"Error running assay in REST Node. {e}"])
-
-        # Interpret response
-        self.logger.log_debug(f"{response=}")
-        if not response["success"]:
-            self.logger.log_error(
-                f"Error running assay. response['success'] is False. response = {response}"
-            )
-            return ActionFailed(
-                errors=[
-                    f"Error running assay. response['success'] is False. response = {response}"
-                ]
-            )
-
-        # Return the path to the data file and the associated labware ID (or None)
-        return (Path(response["data"]), assay_plate_id)
 
 
 if __name__ == "__main__":

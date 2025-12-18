@@ -18,7 +18,7 @@ class BmgCom:
     def __init__(
         self,
         control_name: str,
-        extended_temperature_range_model: bool,
+        extended_temperature_range_model: bool = False,
         logger: EventClient = None,
     ) -> None:
         """Initializes and opens the connection the BMG plate reader"""
@@ -99,7 +99,10 @@ class BmgCom:
 
         # Format and execute action
         nominal_temp = str(temp)
-        self._exec("Temp", nominal_temp)
+        response = self._exec("Temp", nominal_temp)
+        if response != 0:
+            self.logger.log_error(f"Failed to set temperature. response = {response}")
+            raise Exception(f"Failed to set temperature. response = {response}")
 
     def read_temps(self) -> dict:
         """Reads the temperature at three locations in the BMG plate reader
@@ -172,7 +175,9 @@ class BmgCom:
             str(data_output_directory_path),
             data_output_file_name,
         )
-        self.logger.log_info(f"Run action response: {response}")
+        if response != 0:
+            self.logger.log_error(f"Failed to run assay. response = {response}")
+            raise Exception(f"Failed to run assay. response = {response}")
 
         return data_file_path
 

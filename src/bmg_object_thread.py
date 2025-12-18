@@ -89,6 +89,8 @@ class BMGThread(threading.Thread):
                     self._handle_set_temp(command, result)
                 elif action == "read_temps":
                     self._handle_read_temps(result)
+                elif action == "read_error":
+                    self._handle_read_error(result)
                 elif action == "device_state":
                     self._handle_device_state(result)
                 elif action == "run_assay":
@@ -105,8 +107,13 @@ class BMGThread(threading.Thread):
     def _handle_set_temp(self, command: dict, result: dict) -> None:
         """Handle set_temp command."""
         temp = command.get("temp")
-        self.bmg.set_temp(temp=temp)
-        result["success"] = True
+        try:
+            self.bmg.set_temp(temp=temp)
+            result["success"] = True
+        except Exception as e:
+            result["success"] = False
+            result["error"] = e
+            raise e
 
     def _handle_read_temps(self, result: dict) -> None:
         """Handle read_temps command."""
@@ -117,6 +124,16 @@ class BMGThread(threading.Thread):
         else:
             result["success"] = False
             result["error"] = "Unable to read temperatures from BMG device."
+
+    def _handle_read_error(self, result: dict) -> None:
+        """Handle read_temps command."""
+        error = self.bmg.get_error()
+        if error:
+            result["success"] = True
+            result["data"] = error
+        else:
+            result["success"] = False
+            result["error"] = "Unable to read error message from BMG device."
 
     def _handle_device_state(self, result: dict) -> None:
         """Handle device_state command."""
