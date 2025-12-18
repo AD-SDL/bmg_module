@@ -13,11 +13,16 @@ from bmg_interface import BmgCom
 class BMGThread(threading.Thread):
     """Dedicated thread for BMG communication."""
 
-    def __init__(self, logger: EventClient = None) -> None:
+    def __init__(
+        self,
+        extended_temperature_range_model: bool,
+        logger: EventClient = None,
+    ) -> None:
         """Initializes the BMGThread object"""
         super().__init__(daemon=True)
 
         self.logger = logger or EventClient()
+        self.extended_temperature_range_model = extended_temperature_range_model
         self.lock = threading.Lock()
 
         self.command_queue = queue.Queue()
@@ -32,6 +37,7 @@ class BMGThread(threading.Thread):
             # Initialize BMG communication
             self.bmg = BmgCom(
                 "CLARIOstar",
+                extended_temperature_range_model=self.extended_temperature_range_model,
                 logger=self.logger,
             )
             self.logger.log_info("BMG communication thread started.")
@@ -105,8 +111,12 @@ class BMGThread(threading.Thread):
     def _handle_read_temps(self, result: dict) -> None:
         """Handle read_temps command."""
         temps = self.bmg.read_temps()
-        result["success"] = True
-        result["data"] = temps
+        if temps:
+            result["success"] = True
+            result["data"] = temps
+        else:
+            result["success"] = False
+            result["error"] = "Unable to read temperatures from BMG device."
 
     def _handle_device_state(self, result: dict) -> None:
         """Handle device_state command."""
@@ -116,6 +126,7 @@ class BMGThread(threading.Thread):
 
     def _handle_run_assay(self, command: dict, result: dict) -> None:
         """Handle run_assay command."""
+        data_filename = None
         data_filename = self.bmg.run_assay(
             assay_name=command.get("protocol_name"),
             protocol_database_path=command.get("protocol_database_path"),
@@ -123,16 +134,16 @@ class BMGThread(threading.Thread):
             data_output_file_name=command.get("data_output_file_name"),
         )
         if data_filename:
+            result["success"] = True
             result["data"] = data_filename
         else:
+            result["success"] = False
+            result["error"] = (
+                f"No data_filename returned from _handle_run_assay in bmg_object thread. {data_filename=}"
+            )
             self.logger.log_error(
                 "No data_filename returned from _handle_run_assay in bmg_object thread"
             )
-            self.logger.log_error(f"{data_filename=}")
-
-        # Don't fail the action if no data is returned.
-        # Presumably the data is still backed up on local machine.
-        result["success"] = True
 
     def send_command(self, command: dict, timeout: float = 300.0) -> dict:
         """Send a command to the BMG thread and wait for a response.

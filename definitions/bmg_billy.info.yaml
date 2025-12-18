@@ -26,7 +26,7 @@ node_url: null
 actions:
   open:
     name: open
-    description: Opens the BMG plate tray
+    description: Opens the BMG plate tray.
     args: {}
     locations: {}
     files: {}
@@ -39,7 +39,7 @@ actions:
     var_kwargs_schema: null
   close:
     name: close
-    description: Closes the BMG plate tray
+    description: Closes the BMG plate tray.
     args: {}
     locations: {}
     files: {}
@@ -52,11 +52,12 @@ actions:
     var_kwargs_schema: null
   set_temp:
     name: set_temp
-    description: Sets the temperature on the BMG microplate reader
+    description: Sets the temperature on the BMG microplate reader.
     args:
       temp:
         name: temp
-        description: ''
+        description: Temperature in Celcius. Valid options are 0.0, 0.1, or 25.0 through
+          45.0 (10.0 through 60.0 for extended temperature range models).
         argument_type: float
         required: true
         default: null
@@ -81,14 +82,14 @@ actions:
         default: null
       data_output_directory_path:
         name: data_output_directory_path
-        description: data output directory path. Path must point to an existing folder.
+        description: Data output directory path. Path must point to an existing folder.
           Defaults to 'C:\Program Files (x86)\BMG\CLARIOstar\User\Data'
         argument_type: str
         required: false
         default: null
       data_output_file_name:
         name: data_output_file_name
-        description: data output file name (ex. data.txt). Will default to <timestamp>.txt
+        description: Data output file name (ex. data.txt). Will default to <timestamp>.txt
           (ex. 1731706249.txt) if no file name is entered.
         argument_type: str
         required: false
@@ -100,6 +101,19 @@ actions:
         result_label: file
         description: null
         result_type: file
+      json_result:
+        result_label: json_result
+        description: null
+        result_type: json
+        json_schema:
+          properties:
+            data:
+              title: Data
+              type: string
+          required:
+          - data
+          title: strModel
+          type: object
     blocking: false
     asynchronous: true
     accepts_var_args: false
@@ -116,6 +130,7 @@ config:
   uvicorn_kwargs: {}
   data_output_directory_path: C:\Program Files (x86)\BMG\CLARIOstar\User\Data
   db_directory_path: C:\Program Files (x86)\BMG\CLARIOstar\User\Definit
+  extended_temperature_range_model: false
 config_schema:
   description: Configuration for the BMG node.
   properties:
@@ -173,13 +188,9 @@ config_schema:
       description: Configuration for the Uvicorn server that runs the REST API.
       title: Uvicorn Configuration
       type: object
-    data_output_directory_path:
-      default: C:\Program Files (x86)\BMG\CLARIOstar\User\Data
-      title: Data Output Directory Path
-      type: string
-    db_directory_path:
-      default: C:\Program Files (x86)\BMG\CLARIOstar\User\Definit
-      title: Db Directory Path
-      type: string
+    extended_temperature_range_model:
+      default: false
+      title: Extended Temperature Range Model
+      type: boolean
   title: BMGNodeConfig
   type: object

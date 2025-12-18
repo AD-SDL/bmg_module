@@ -2,7 +2,7 @@
 REST-based node for BMG microplate readers that interfaces with WEI
 """
 
-from pathlib import Path
+from pathlib import Path, WindowsPath
 from typing import Annotated, Optional
 
 from madsci.common.types.action_types import ActionFailed
@@ -10,6 +10,7 @@ from madsci.common.types.node_types import RestNodeConfig
 from madsci.common.types.resource_types import Slot
 from madsci.node_module.helpers import action
 from madsci.node_module.rest_node_module import RestNode
+from pydantic.json_schema import SkipJsonSchema
 
 from bmg_interface import BmgCom
 from bmg_object_thread import BMGThread
@@ -18,16 +19,17 @@ from bmg_object_thread import BMGThread
 class BMGNodeConfig(RestNodeConfig):
     """Configuration for the BMG node."""
 
-    data_output_directory_path: Path = Path(
-        "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
+    data_output_directory_path: SkipJsonSchema[WindowsPath] = WindowsPath(
+        "C:/Program Files (x86)/BMG/CLARIOstar/User/Data"
     )
     """Data output directory path for bmg data"""
-    db_directory_path: Path = Path(
-        "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit"
+    db_directory_path: SkipJsonSchema[WindowsPath] = WindowsPath(
+        "C:/Program Files (x86)/BMG/CLARIOstar/User/Definit"
     )
-    """Path to directory where assay protocol files are stored"""
     state_update_interval: Optional[float] = 5.0
     """Interval for updating module state in seconds"""
+    extended_temperature_range_model: bool = False
+    """True if your device allows an extended temperature range (10 deg C to 60 deg C)"""
 
 
 class BMGNode(RestNode):
@@ -55,6 +57,7 @@ class BMGNode(RestNode):
 
         # Start the BMG thread after resources are initialized
         self.bmg_thread = BMGThread(
+            extended_temperature_range_model=self.config.extended_temperature_range_model,
             logger=self.logger,
         )
         self.bmg_thread.start()
@@ -120,7 +123,16 @@ class BMGNode(RestNode):
                     self.cached_device_state = device_state["data"]
 
             except Exception as e:
+                """Do nothing except log the error if collecting device state in the
+                state handler doesn't work. We want any running actions to continue or
+                for the device to remain ready to receive the next action, regardless
+                of our ability to collect this device state data."""
                 self.logger.log_error(f"Error collecting device state: {e}")
+
+            """Log if the device returns that it is in an Error state.
+            This doesn't stop  """
+            if self.cached_device_state == "Error":
+                self.logger.log_warning("Device is in an Error state.")
 
             try:
                 # Collect temperature readings
@@ -138,8 +150,11 @@ class BMGNode(RestNode):
                     "bmg_device_state": self.cached_device_state,
                 }
             except Exception as e:
-                # Do nothing except log the error if state handler doesn't work
-                self.logger.log_warning(f"Error in state handler: {e}")
+                """Do nothing except log the error if collecting temperatures in the
+                state handler doesn't work. We want any running actions to continue or
+                for the device to remain ready to receive the next action, regardless
+                of our ability to collect this temperature data."""
+                self.logger.log_error(f"Error collecting device temperatures: {e}")
 
     def shutdown_handler(self) -> None:
         """Called to clean up resources before the node is shut down."""
@@ -179,13 +194,24 @@ class BMGNode(RestNode):
         self.logger.log_info("BMG plate tray closed.")
 
     @action(name="set_temp")
-    def set_temp(self, temp: float) -> None:
+    def set_temp(
+        self,
+        temp: Annotated[
+            float,
+            "Temperature in Celcius. Valid options are 0.0, 0.1, or 25.0 through 45.0 (10.0 through 60.0 for extended temperature range models).",
+        ],
+    ) -> None:
         """Sets the temperature on the BMG microplate reader."""
 
         temp = float(temp)
-        if temp in {0.0, 0.1} or 25.0 <= temp <= 45.0:
+        min_temp, max_temp = (
+            (10.0, 60.0)
+            if self.config.extended_temperature_range_model
+            else (25.0, 45.0)
+        )
+
+        if temp in {0.0, 0.1} or min_temp <= temp <= max_temp:
             # Temp input is valid, send the command
-            # NOTE: These temp values are specific to our model of BMG Plate Reader (VANTAStar)
             response = self.bmg_thread.send_command(
                 {"action": "set_temp", "temp": temp}
             )
@@ -206,11 +232,11 @@ class BMGNode(RestNode):
         assay_name: str,
         data_output_directory_path: Annotated[
             Optional[str],
-            "data output directory path. Path must point to an existing folder. Defaults to 'C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data'",
+            "Data output directory path. Path must point to an existing folder. Defaults to 'C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data'",
         ] = None,
         data_output_file_name: Annotated[
             Optional[str],
-            "data output file name (ex. data.txt). Will default to <timestamp>.txt (ex. 1731706249.txt) if no file name is entered.",
+            "Data output file name (ex. data.txt). Will default to <timestamp>.txt (ex. 1731706249.txt) if no file name is entered.",
         ] = None,
     ) -> Annotated[tuple[Path, str], "Returns (data file path, assay plate ID)"]:
         """Runs an assay on the BMG plate reader"""
@@ -224,7 +250,7 @@ class BMGNode(RestNode):
         else:
             # Check that the directory path exists
             try:
-                if not Path(data_output_directory_path).is_dir():
+                if not WindowsPath(data_output_directory_path).is_dir():
                     return ActionFailed(
                         f"data_output_directory_path {data_output_directory_path} is not an existing folder"
                     )
@@ -233,24 +259,33 @@ class BMGNode(RestNode):
                 return ActionFailed(f"data_directory_output_path is invalid: {e}")
 
         # Run the assay, collect response containing output data file name
-        response = self.bmg_thread.send_command(
-            {
-                "action": "run_assay",
-                "protocol_name": assay_name,
-                "protocol_database_path": self.config.db_directory_path,
-                "data_output_directory_path": data_output_directory_path,
-                "data_output_file_name": data_output_file_name,
-            }
-        )
+        try:
+            response = self.bmg_thread.send_command(
+                {
+                    "action": "run_assay",
+                    "protocol_name": assay_name,
+                    "protocol_database_path": str(self.config.db_directory_path),
+                    "data_output_directory_path": str(data_output_directory_path),
+                    "data_output_file_name": data_output_file_name,
+                }
+            )
+        except Exception as e:
+            self.logger.log_error(f"Error running assay in REST Node. {e}")
+            return ActionFailed(errors=[f"Error running assay in REST Node. {e}"])
 
         # Interpret response
         self.logger.log_debug(f"{response=}")
         if not response["success"]:
-            self.logger.log_error(f"Error running assay: {response['error']}")
-            self.logger.log_error(f"response: {response}")
-            return ActionFailed(errors=[f"Error running assay: {response['error']}"])
+            self.logger.log_error(
+                f"Error running assay. response['success'] is False. response = {response}"
+            )
+            return ActionFailed(
+                errors=[
+                    f"Error running assay. response['success'] is False. response = {response}"
+                ]
+            )
 
-        # return the path to the data file and the associated labware id (or None)
+        # Return the path to the data file and the associated labware ID (or None)
         return (Path(response["data"]), assay_plate_id)
 
 

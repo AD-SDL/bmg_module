@@ -18,11 +18,13 @@ class BmgCom:
     def __init__(
         self,
         control_name: str,
+        extended_temperature_range_model: bool,
         logger: EventClient = None,
     ) -> None:
         """Initializes and opens the connection the BMG plate reader"""
 
         self.control_name = control_name
+        self.extended_temperature_range_model = extended_temperature_range_model
         self.logger = logger or EventClient()
 
         pythoncom.CoInitialize()
@@ -86,12 +88,16 @@ class BmgCom:
             - Temp must be a float to be valid.
             - If more than one decimal point are included, will round to nearest valid temp input.
         """
-        # Check that temperature input is valid (Outer range checked. Valid temp range varies by device model.)
-        if not 10.0 <= temp <= 60.0 or temp in [0.0, 0.1]:
+        # Check that temperature input is valid. Valid temp range varies by device model.
+        min_temp, max_temp = (
+            (10.0, 60.0) if self.extended_temperature_range_model else (25.0, 45.0)
+        )
+        if not min_temp <= temp <= max_temp and temp not in [0.0, 0.1]:
             raise ValueError(
-                "Temp argument must be a valid float between 10.0 and 60.0, or equal to 0.0 or 0.1"
+                f"Temp argument must be a valid float between {min_temp} and {max_temp}, or equal to 0.0 or 0.1"
             )
 
+        # Format and execute action
         nominal_temp = str(temp)
         self._exec("Temp", nominal_temp)
 
@@ -99,13 +105,12 @@ class BmgCom:
         """Reads the temperature at three locations in the BMG plate reader
 
         Returns: a dictionary of temperature readouts.
-            temps = {
+            {
                 "Temp1": (float temperature reading from bottom heating plate)
                 "Temp2": (float temperature reading from top heating plate)
                 "Temp3:" (float temperature reading from optic slide heating plate)
             }
         """
-        temps = {}
         temp1_formatted = ctypes.c_char_p(b"Temp1")
         temp1 = self.com.GetInfo(temp1_formatted)
         temp2_formatted = ctypes.c_char_p(b"Temp2")
@@ -113,23 +118,15 @@ class BmgCom:
         temp3_formatted = ctypes.c_char_p(b"Temp3")
         temp3 = self.com.GetInfo(temp3_formatted)
 
-        try:
-            # Convert to floats in Celsius
-            temp1 = float(temp1) / 10
-            temp2 = float(temp2) / 10
-            temp3 = float(temp3) / 10
-            temps = {
-                "Temp1": temp1,
-                "Temp2": temp2,
-                "Temp3": temp3,
-            }
-        except Exception:
-            """Do not raise an exception if temperature collection fails.
-            Any running action should continue, regardless of whether this
-            temperature collection is successful."""
-            self.logger.log_error("Error collecting temperatures: {e}")
-
-        return temps
+        # Convert to floats in Celsius
+        temp1 = float(temp1) / 10
+        temp2 = float(temp2) / 10
+        temp3 = float(temp3) / 10
+        return {
+            "Temp1": temp1,
+            "Temp2": temp2,
+            "Temp3": temp3,
+        }
 
     def run_assay(
         self,
@@ -163,15 +160,16 @@ class BmgCom:
         data_dir = Path(data_output_directory_path)
         data_file_path = data_dir / data_output_file_name
 
+        # Execute run assay command
         response = self._exec(
             "Run",
             assay_name,
-            protocol_database_path,
-            data_output_directory_path,
+            str(protocol_database_path),
+            str(data_output_directory_path),
             plate_id1,
             plate_id2,
             plate_id3,
-            data_output_directory_path,
+            str(data_output_directory_path),
             data_output_file_name,
         )
         self.logger.log_info(f"Run action response: {response}")
