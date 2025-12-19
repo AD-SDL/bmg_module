@@ -49,9 +49,16 @@ You can also use the driver in other programs. The example Python program below 
 
 When instantiating the bmg_device, the model name must be entered as "CLARIOstar" even if you own a BMG VANTAstar device. Also, be sure to replace the protocol_database_path and data_output_directory values with your correct paths.
 
+If you own a BMG device with extended temperature range (10.0 deg C to 60.0 deg C), you will need to specify this when instantiating your BMG device in the code below.
+
     import bmg_interface
 
-    bmg_device = bmg_interface.BmgCom("CLARIOstar")
+    bmg_device = bmg_interface.BmgCom(control_name = "CLARIOstar")
+    # for extended temperature range models, use the instantiation below instead.
+    # bmg_device = bmg_interface.BmgCom(
+    #    control_name = "CLARIOstar",
+    #    extended_temperature_range_model = True,
+    # )
     bmg_device.plate_out()
     bmg_device.plate_in()
     bmg_device.set_temp(30.0)
@@ -67,11 +74,13 @@ When instantiating the bmg_device, the model name must be entered as "CLARIOstar
 
 The REST Node can be started with a command in the format below.
 
-    python bmg_rest_node.py --node_url <(str, optional) address for your LiCONiC MADSci REST Node> --db_directory_path <(str, optional) path to bmg db directory containing assay .TCS files> --output_path <(str, optional) path to directory for saving data output files>
+    python bmg_rest_node.py --node_url <(str, optional) address for your LiCONiC MADSci REST Node> --db_directory_path <(str, optional) path to bmg db directory containing assay .TCS files> --data_output_directory_path <(str, optional) path to directory for saving data output files> --extended_temperature_range_model <(bool, optional) True if your BMG device has an extended temperature range of 10.0 deg C to 60.0 deg C, False if your BMG device has a temperature range of 25.0 deg C to 45.0 deg C>
 
 --node_url will default to "http://127.0.0.1:2000" \
 --db_directory_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" \
-and --output_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
+--data_output_directory_path will default to "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data" \
+and --extended_temperature_range_model will default to False.
+
 
 Example usage with no optional arguments:
 
@@ -81,13 +90,11 @@ Example usage with no optional arguments:
 
 Example usage with all optional arguments:
 
-
-    python bmg_rest_node.py --node_url "http://127.0.0.1:3003" --db_directory_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" --output_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data"
-
+    python bmg_rest_node.py --node_url "http://127.0.0.1:3003" --db_directory_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Definit" --data_output_directory_path "C:\\Program Files (x86)\\BMG\\CLARIOstar\\User\\Data" --extended_temperature_range_model False
 
 ### Example Usage in MADSci Workflow YAML file
 
-Below is an example of a MADSci YAML workflow file that interacts with the BMG REST Node. Replace "ASSAY_NAME" and "ASSAY_DATA.txt" with the name of the assay you wish to run on the BMG and the desired output data file name.
+Below is an example of a MADSci YAML workflow file that interacts with the BMG REST Node. Replace "ASSAY_NAME","ASSAY_DATA.txt", and "YOUR/DATA/OUTPUT/PATH/" with the name of the assay you wish to run on the BMG, the desired output data file name, and the path to the directory where the output data will be stored.
 
     name: Test Workflow
 
@@ -117,3 +124,4 @@ Below is an example of a MADSci YAML workflow file that interacts with the BMG R
       args:
         assay_name: ASSAY_NAME
         data_output_file_name: ASSAY_DATA.txt
+        data_output_directory_path: YOUR/DATA/OUTPUT/PATH/

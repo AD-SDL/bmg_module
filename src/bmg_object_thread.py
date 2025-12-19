@@ -126,7 +126,7 @@ class BMGThread(threading.Thread):
             result["error"] = "Unable to read temperatures from BMG device."
 
     def _handle_read_error(self, result: dict) -> None:
-        """Handle read_temps command."""
+        """Handle read_error command."""
         error = self.bmg.get_error()
         if error:
             result["success"] = True
