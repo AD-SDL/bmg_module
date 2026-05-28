@@ -1,18 +1,20 @@
-"""
-REST-based node for BMG microplate readers that interfaces with WEI
+"""REST-based MADSci node for BMG microplate readers.
+
+The node delegates all BMG ActiveX COM calls to a separate 32-bit FastAPI
+sidecar process (see bmg_module/sidecar/), because madsci.common (v0.8) pulls
+in psycopg2-binary, which has no win32 wheel. This file talks to the sidecar
+over loopback HTTP, mirroring the pattern used by inheco_incubator_module.
 """
 
 from pathlib import Path
-from typing import Annotated, Optional
+from typing import Annotated, Any, Optional
 
+import requests
 from madsci.common.types.action_types import ActionFailed
 from madsci.common.types.node_types import RestNodeConfig
 from madsci.common.types.resource_types import Slot
 from madsci.node_module.helpers import action
 from madsci.node_module.rest_node_module import RestNode
-
-from bmg_interface import BmgCom
-from bmg_object_thread import BMGThread
 
 
 class BMGNodeConfig(RestNodeConfig):
@@ -21,18 +23,25 @@ class BMGNodeConfig(RestNodeConfig):
     data_output_directory_path: Path = Path(
         "C:/Program Files (x86)/BMG/CLARIOstar/User/Data"
     )
-    """Data output directory path for bmg data"""
+    """Data output directory path for bmg data."""
     db_directory_path: Path = Path("C:/Program Files (x86)/BMG/CLARIOstar/User/Definit")
+    """Path to the protocol database directory."""
     state_update_interval: Optional[float] = 5.0
-    """Interval for updating module state in seconds"""
+    """Interval for updating module state in seconds."""
     extended_temperature_range_model: bool = False
-    """True if your device allows an extended temperature range (10 deg C to 60 deg C)"""
+    """True if your device allows an extended temperature range (10-60 deg C)."""
+
+    sidecar_host: str = "127.0.0.1"
+    """Host of the 32-bit BMG COM sidecar (typically loopback)."""
+    sidecar_port: int = 7002
+    """Port the BMG COM sidecar listens on."""
+    sidecar_timeout: float = 300.0
+    """Per-request timeout (seconds) when talking to the sidecar."""
 
 
 class BMGNode(RestNode):
-    """A node to control the BMG VANTAstar microplate reader"""
+    """A node to control the BMG VANTAstar microplate reader."""
 
-    bmg: BmgCom = None
     config_model = BMGNodeConfig
     config: BMGNodeConfig = BMGNodeConfig()
     module_version = "0.0.1"
@@ -40,29 +49,49 @@ class BMGNode(RestNode):
     def __init__(self) -> None:
         """Initializes the BMG node."""
         super().__init__()
-        self.bmg_thread = None
         self.cached_temp1 = None
         self.cached_temp2 = None
         self.cached_temp3 = None
         self.cached_device_state = None
         self.cached_current_errors = None
 
-    def startup_handler(self) -> None:
-        """Called to (re)initialize the node. Should be used to open connections to devices or initialize any other resources."""
+    # ---- Sidecar HTTP helpers -------------------------------------------------
 
+    def _url(self, endpoint: str) -> str:
+        endpoint = endpoint.lstrip("/")
+        return f"http://{self.config.sidecar_host}:{self.config.sidecar_port}/{endpoint}"
+
+    def _get(self, endpoint: str) -> Any:
+        response = requests.get(self._url(endpoint), timeout=self.config.sidecar_timeout)
+        response.raise_for_status()
+        return response.json()
+
+    def _post(self, endpoint: str, body: Optional[dict] = None) -> Any:
+        response = requests.post(
+            self._url(endpoint),
+            json=body if body is not None else {},
+            timeout=self.config.sidecar_timeout,
+        )
+        response.raise_for_status()
+        return response.json()
+
+    # ---- Lifecycle ------------------------------------------------------------
+
+    def startup_handler(self) -> None:
+        """Verify the sidecar is reachable and initialize MADSci resources."""
+        self._get("/")  # let exception bubble up if sidecar isn't up yet
+        self.logger.log_info(
+            f"BMG sidecar reachable at {self.config.sidecar_host}:{self.config.sidecar_port}"
+        )
         self.init_resource_templates()
         self.create_resources()
 
-        # Start the BMG thread after resources are initialized
-        self.bmg_thread = BMGThread(
-            extended_temperature_range_model=self.config.extended_temperature_range_model,
-            logger=self.logger,
-        )
-        self.bmg_thread.start()
+    def shutdown_handler(self) -> None:
+        """No-op: the sidecar is a separate process managed by process-compose."""
+        self.logger.log_info("BMG node shutting down (sidecar lifecycle is external).")
 
     def init_resource_templates(self) -> None:
         """Initialize resource templates for the node module."""
-
         self.resource_client.create_template(
             resource=Slot(
                 resource_description="The plate nest for a BMG microplate reader",
@@ -74,14 +103,13 @@ class BMGNode(RestNode):
 
     def create_resources(self) -> None:
         """Create resources for the node module."""
-
         self.plate_carrier = self.resource_client.create_resource_from_template(
             template_name="bmg.nest",
-            resource_name=f"{self.node_definition.node_name}.nest",
+            resource_name=f"{self.node_info.node_name}.nest",
         )
 
     def collect_current_plate_resource(self) -> str:
-        """Collects the resource ID of the labware in the BMG Plate Nest according to the Resource Manager"""
+        """Collect the resource ID of the labware in the BMG plate nest, if any."""
         assay_plate_resource_id = None
         try:
             child_resource = self.resource_client.get_resource(self.plate_carrier).child
@@ -89,120 +117,79 @@ class BMGNode(RestNode):
                 child_resource.resource_id if child_resource else None
             )
         except Exception as e:
-            # Don't fail the action if the child resource ID cannot be collected
             self.logger.log_error(e)
-
         return assay_plate_resource_id
 
-    def state_handler(self) -> None:
-        """Periodically check state of BMG device"""
+    # ---- State ----------------------------------------------------------------
 
-        if self.bmg_thread is None:
-            self.logger.log_error("BMG thread is not initialized")
+    def state_handler(self) -> None:
+        """Periodically check state of the BMG device via the sidecar."""
+        try:
+            busy = self._get("is_busy")["busy"]
+        except Exception as e:
+            self.logger.log_error(f"Error querying sidecar /is_busy: {e}")
             return
 
-        # If the BMG device is busy, report cached values.
-        if self.bmg_thread.is_busy:
+        if busy:
             self.node_state = {
                 "Temp1 (bottom heating plate)": self.cached_temp1,
                 "Temp2 (top heating plate)": self.cached_temp2,
                 "Temp3 (optic slide heating plate)": self.cached_temp3,
-                "bmg_thread_state": "BUSY",
                 "bmg_device_state": "busy",
                 "errors": self.cached_current_errors,
             }
+            return
 
-        # If the BMG device is not busy, query for new state values.
-        else:
-            # Collect device state
-            try:
-                device_state = self.bmg_thread.send_command({"action": "device_state"})
-                if not device_state["success"]:
-                    self.cached_device_state = "unknown"
-                else:
-                    self.cached_device_state = device_state["data"]
-            except Exception as e:
-                """Do nothing except log the error if collecting device state in the
-                state handler doesn't work. We want any running actions to continue or
-                for the device to remain ready to receive the next action, regardless
-                of our ability to collect this device state data."""
-                self.logger.log_error(f"Error collecting device state: {e}")
-
-            # Collect any error messages if device is in an error state
-            if self.cached_device_state == "Error":
-                self.logger.log_warning("Device is in an Error state.")
-                try:
-                    self.cached_current_errors = self.bmg_thread.send_command(
-                        {"action": "read_error"}
-                    )["data"]
-                except Exception as e:
-                    """Do nothing except log the error if the the device error messages cannot
-                    be collected. Error messages on the device often do not prevent the device
-                    from running the next action."""
-                    self.logger.log_warning(
-                        f"Error collecting current device errors: {e}"
-                    )
-            else:
-                self.cached_current_errors = None
-
-            # Collect temperature readings
-            try:
-                response = self.bmg_thread.send_command({"action": "read_temps"})
-                temps = response["data"]
-                self.cached_temp1 = temps["Temp1"]
-                self.cached_temp2 = temps["Temp2"]
-                self.cached_temp3 = temps["Temp3"]
-
-                self.node_state = {
-                    "Temp1 (bottom heating plate)": self.cached_temp1,
-                    "Temp2 (top heating plate)": self.cached_temp2,
-                    "Temp3 (optic slide heating plate)": self.cached_temp3,
-                    "bmg_thead_state": "READY",
-                    "bmg_device_state": self.cached_device_state,
-                    "errors": self.cached_current_errors,
-                }
-            except Exception as e:
-                """Do nothing except log the error if collecting temperatures in the
-                state handler doesn't work. We want any running actions to continue or
-                for the device to remain ready to receive the next action, regardless
-                of our ability to collect this temperature data."""
-                self.logger.log_error(f"Error collecting device temperatures: {e}")
-
-    def shutdown_handler(self) -> None:
-        """Called to clean up resources before the node is shut down."""
+        # Device idle — refresh cached values.
         try:
-            if self.bmg_thread:
-                self.bmg_thread.stop()
+            self.cached_device_state = self._get("status").get("status", "unknown")
+        except Exception as e:
+            self.logger.log_error(f"Error collecting device state: {e}")
 
-        except Exception as err:
-            self.logger.log_error(f"Error during BMG thread and node shutdown: {err}")
+        if self.cached_device_state == "Error":
+            self.logger.log_warning("Device is in an Error state.")
+            try:
+                self.cached_current_errors = self._get("error").get("error")
+            except Exception as e:
+                self.logger.log_warning(f"Error collecting current device errors: {e}")
+        else:
+            self.cached_current_errors = None
+
+        try:
+            temps = self._get("temps")
+            self.cached_temp1 = temps["Temp1"]
+            self.cached_temp2 = temps["Temp2"]
+            self.cached_temp3 = temps["Temp3"]
+            self.node_state = {
+                "Temp1 (bottom heating plate)": self.cached_temp1,
+                "Temp2 (top heating plate)": self.cached_temp2,
+                "Temp3 (optic slide heating plate)": self.cached_temp3,
+                "bmg_device_state": self.cached_device_state,
+                "errors": self.cached_current_errors,
+            }
+        except Exception as e:
+            self.logger.log_error(f"Error collecting device temperatures: {e}")
+
+    # ---- Actions --------------------------------------------------------------
 
     @action(name="open")
     def open(self) -> None:
-        """Opens the BMG plate tray."""
-
+        """Open the BMG plate tray."""
         self.logger.log_info("Opening BMG plate tray.")
-
-        # Send command to BMG thread
-        response = self.bmg_thread.send_command({"action": "plate_out"})
-
-        # Interpret response
-        if not response["success"]:
-            raise Exception(f"Failed to open BMG plate tray: {response['error']}")
+        try:
+            self._post("plate_out")
+        except Exception as e:
+            raise Exception(f"Failed to open BMG plate tray: {e}") from e
         self.logger.log_info("BMG plate tray opened.")
 
     @action(name="close")
     def close(self) -> None:
-        """Closes the BMG plate tray."""
-
+        """Close the BMG plate tray."""
         self.logger.log_info("Closing BMG plate tray.")
-
-        # Send command to BMG thread
-        response = self.bmg_thread.send_command({"action": "plate_in"})
-
-        # Interpret response
-        if not response["success"]:
-            raise Exception(f"Failed to close BMG plate tray: {response['error']}")
+        try:
+            self._post("plate_in")
+        except Exception as e:
+            raise Exception(f"Failed to close BMG plate tray: {e}") from e
         self.logger.log_info("BMG plate tray closed.")
 
     @action(name="set_temp")
@@ -210,11 +197,10 @@ class BMGNode(RestNode):
         self,
         temp: Annotated[
             float,
-            "Temperature in Celcius. Valid options are 0.0, 0.1, or 25.0 through 45.0 (10.0 through 60.0 for extended temperature range models).",
+            "Temperature in Celsius. Valid options are 0.0, 0.1, or 25.0 through 45.0 (10.0 through 60.0 for extended temperature range models).",
         ],
     ) -> None:
-        """Sets the temperature on the BMG microplate reader."""
-
+        """Set the temperature on the BMG microplate reader."""
         temp = float(temp)
         min_temp, max_temp = (
             (10.0, 60.0)
@@ -222,24 +208,17 @@ class BMGNode(RestNode):
             else (25.0, 45.0)
         )
 
-        if temp in {0.0, 0.1} or min_temp <= temp <= max_temp:
-            # Temp input is valid, send the command
-            try:
-                response = self.bmg_thread.send_command(
-                    {"action": "set_temp", "temp": temp}
-                )
-                # Interpret response
-                if response["success"]:
-                    return None
-                return ActionFailed(errors=response["error"])
-            except Exception as e:
-                self.logger.log_error(f"Exception raised from set_temp action: {e}")
-                return ActionFailed(
-                    errors=f"Exception raised from set_temp action: {e}"
-                )
-        else:
-            # Temp input is not valid (fail action, don't put node in error state)
+        if not (temp in {0.0, 0.1} or min_temp <= temp <= max_temp):
             return ActionFailed(errors=["Invalid temperature input value."])
+
+        try:
+            self._post("set_temp", {"temp": temp})
+        except requests.HTTPError as e:
+            return ActionFailed(errors=[f"Sidecar rejected set_temp: {e}"])
+        except Exception as e:
+            self.logger.log_error(f"Exception raised from set_temp action: {e}")
+            return ActionFailed(errors=[f"Exception raised from set_temp action: {e}"])
+        return None
 
     @action(name="run_assay")
     def run_assay(
@@ -254,16 +233,12 @@ class BMGNode(RestNode):
             "Data output file name (ex. data.txt). Will default to <timestamp>.txt (ex. 1731706249.txt) if no file name is entered.",
         ] = None,
     ) -> Annotated[tuple[Path, str], "Returns (data file path, assay plate ID)"]:
-        """Runs an assay on the BMG plate reader"""
-
-        # Collect the resource ID of the assay plate in the BMG reader, if any. None if no assay plate present according to resource manager.
+        """Run an assay on the BMG plate reader."""
         assay_plate_id = self.collect_current_plate_resource()
 
-        # Collect and validate the data_directory_path
         if data_output_directory_path is None:
-            data_output_directory_path = self.config.data_output_directory_path
+            data_output_directory_path = str(self.config.data_output_directory_path)
         else:
-            # Check that the directory path exists
             try:
                 if not Path(data_output_directory_path).is_dir():
                     return ActionFailed(
@@ -273,23 +248,17 @@ class BMGNode(RestNode):
                 self.logger.log_error(f"data_directory_output_path is invalid: {e}")
                 return ActionFailed(f"data_directory_output_path is invalid: {e}")
 
-        # Run the assay, collect response containing output data file name
         try:
-            response = self.bmg_thread.send_command(
+            response = self._post(
+                "run_assay",
                 {
-                    "action": "run_assay",
-                    "protocol_name": assay_name,
+                    "assay_name": assay_name,
                     "protocol_database_path": str(self.config.db_directory_path),
                     "data_output_directory_path": str(data_output_directory_path),
                     "data_output_file_name": data_output_file_name,
-                }
+                },
             )
-            # Interpret response
-            if response["success"]:
-                return (Path(response["data"]), assay_plate_id)
-            self.logger.log_error(f"Error running assay. {response=}")
-            return ActionFailed(errors=[f"Error running assay. {response=}"])
-
+            return (Path(response["data_file_path"]), assay_plate_id)
         except Exception as e:
             self.logger.log_error(f"Error running assay in REST Node. {e}")
             return ActionFailed(errors=[f"Error running assay in REST Node. {e}"])
