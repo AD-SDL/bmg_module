@@ -20,7 +20,9 @@ class SetTempRequest(BaseModel):
 class RunAssayRequest(BaseModel):
     """Body for POST /run_assay."""
 
-    assay_name: str = Field(..., description="Protocol name as defined in SMART Control.")
+    assay_name: str = Field(
+        ..., description="Protocol name as defined in SMART Control."
+    )
     protocol_database_path: str = Field(
         ..., description="Path to the BMG protocol database directory."
     )

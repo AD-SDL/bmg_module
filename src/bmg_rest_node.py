@@ -59,10 +59,14 @@ class BMGNode(RestNode):
 
     def _url(self, endpoint: str) -> str:
         endpoint = endpoint.lstrip("/")
-        return f"http://{self.config.sidecar_host}:{self.config.sidecar_port}/{endpoint}"
+        return (
+            f"http://{self.config.sidecar_host}:{self.config.sidecar_port}/{endpoint}"
+        )
 
     def _get(self, endpoint: str) -> Any:
-        response = requests.get(self._url(endpoint), timeout=self.config.sidecar_timeout)
+        response = requests.get(
+            self._url(endpoint), timeout=self.config.sidecar_timeout
+        )
         response.raise_for_status()
         return response.json()
 
