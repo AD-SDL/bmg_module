@@ -7,11 +7,15 @@ over loopback HTTP, mirroring the pattern used by inheco_incubator_module.
 """
 
 from pathlib import Path
-from typing import Annotated, Any, Optional
+from typing import Annotated, Any, ClassVar, Optional
 
 import requests
 from madsci.common.types.action_types import ActionFailed
-from madsci.common.types.node_types import RestNodeConfig
+from madsci.common.types.node_types import (
+    NodeIntrinsicLocationDefinition,
+    NodeRepresentationTemplateDefinition,
+    RestNodeConfig,
+)
 from madsci.common.types.resource_types import Slot
 from madsci.node_module.helpers import action
 from madsci.node_module.rest_node_module import RestNode
@@ -45,6 +49,39 @@ class BMGNode(RestNode):
     config_model = BMGNodeConfig
     config: BMGNodeConfig = BMGNodeConfig()
     module_version = "0.0.1"
+
+    # Define representation templates and intrinsic locations for the BMG node.
+    location_representation_templates: ClassVar[
+        list[NodeRepresentationTemplateDefinition]
+    ] = [
+        NodeRepresentationTemplateDefinition(
+            template_name="bmg_carriage_repr",
+            default_values={"carriage_type": "standard", "capacity": 1},
+            schema_def={
+                "type": "object",
+                "properties": {
+                    "capacity": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "description": "Number of plates the carriage can hold",
+                    },
+                },
+            },
+            required_overrides=[],
+            tags=["plate_reader", "carriage"],
+            version="1.0.0",
+            description="BMG carriage representation with capacity",
+        ),
+    ]
+    intrinsic_locations: ClassVar[list[NodeIntrinsicLocationDefinition]] = [
+        NodeIntrinsicLocationDefinition(
+            location_name="bmg_carriage",
+            description="BMG microplate reader carriage.",
+            representation_template_name="bmg_carriage_repr",
+            resource_template_name="bmg.nest",
+            allow_transfers=True,
+        ),
+    ]
 
     def __init__(self) -> None:
         """Initializes the BMG node."""
