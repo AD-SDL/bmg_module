@@ -92,6 +92,12 @@ class BMGNode(RestNode):
         self.cached_device_state = None
         self.cached_current_errors = None
 
+        # Extract the resource ID of the intrinsic location for the BMG plate carriage.
+        carriage_location_name = f"{self.node_info.node_name}.bmg_carriage"
+        self.plate_carrier = self.location_client.get_location_by_name(
+            location_name=carriage_location_name
+        ).resource_id
+
     # ---- Sidecar HTTP helpers -------------------------------------------------
 
     def _url(self, endpoint: str) -> str:
@@ -125,7 +131,6 @@ class BMGNode(RestNode):
             f"BMG sidecar reachable at {self.config.sidecar_host}:{self.config.sidecar_port}"
         )
         self.init_resource_templates()
-        self.create_resources()
 
     def shutdown_handler(self) -> None:
         """No-op: the sidecar is a separate process managed by process-compose."""
@@ -142,16 +147,10 @@ class BMGNode(RestNode):
             tags=["PlateNest", "ANSI/SLAS"],
         )
 
-    def create_resources(self) -> None:
-        """Create resources for the node module."""
-        self.plate_carrier = self.resource_client.create_resource_from_template(
-            template_name="bmg.nest",
-            resource_name=f"{self.node_info.node_name}.nest",
-        )
-
     def collect_current_plate_resource(self) -> str:
         """Collect the resource ID of the labware in the BMG plate nest, if any."""
         assay_plate_resource_id = None
+
         try:
             child_resource = self.resource_client.get_resource(self.plate_carrier).child
             assay_plate_resource_id = (
@@ -275,10 +274,12 @@ class BMGNode(RestNode):
         ] = None,
     ) -> Annotated[tuple[Path, str], "Returns (data file path, assay plate ID)"]:
         """Run an assay on the BMG plate reader."""
+
         assay_plate_id = self.collect_current_plate_resource()
 
         if data_output_directory_path is None:
             data_output_directory_path = str(self.config.data_output_directory_path)
+
         else:
             try:
                 if not Path(data_output_directory_path).is_dir():
@@ -299,7 +300,9 @@ class BMGNode(RestNode):
                     "data_output_file_name": data_output_file_name,
                 },
             )
+
             return (Path(response["data_file_path"]), assay_plate_id)
+
         except Exception as e:
             self.logger.log_error(f"Error running assay in REST Node. {e}")
             return ActionFailed(errors=[f"Error running assay in REST Node. {e}"])
