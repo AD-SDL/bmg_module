@@ -1,0 +1,32 @@
+[project]
+name = "bmg_sidecar"
+version = "0.1.0"
+description = "32-bit FastAPI sidecar that owns the BMG VANTAstar/CLARIOstar ActiveX COM connection on behalf of the MADSci bmg_module node."
+authors = [
+    {name = "Casey Stone", email = "cstone@anl.gov"},
+    {name = "Ryan D. Lewis", email = "ryan.lewis@anl.gov"},
+]
+requires-python = ">=3.10,<3.13"
+readme = "README.md"
+license = {text = "MIT"}
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn[standard]>=0.32",
+    "pydantic>=2.10",
+    "comtypes",
+    "pywin32",
+]
+
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+# The sidecar is a script bundle, not an importable package — tell setuptools
+# there are no top-level packages or modules to install.
+[tool.setuptools]
+py-modules = []
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.7",
+]
